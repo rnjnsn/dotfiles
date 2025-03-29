@@ -1,3 +1,6 @@
 .dotfiles
 .dotfiles
 .config/alacritty/themes
+.config/nvim/undo/
+.config/nvim/backup/
+.config/nvim/swap/
