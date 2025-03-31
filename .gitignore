@@ -4,3 +4,4 @@
 .config/nvim/undo/
 .config/nvim/backup/
 .config/nvim/swap/
+scripts/
