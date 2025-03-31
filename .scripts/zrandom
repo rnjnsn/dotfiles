@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# Set the Zettelkasten directory
+ZET_DIR="/Users/renejensen/Library/CloudStorage/GoogleDrive-r@rnjnsn.com/My Drive/rnjnsn/3. zettelkasten"
+
+# Function to extract the check number from a tag
+get_check_number() {
+    local tag="$1"
+    if [[ $tag =~ ([0-9]+)_check ]]; then
+        echo "${BASH_REMATCH[1]}"
+    else
+        echo "0"
+    fi
+}
+
+# Function to get the current check level of a file
+get_check_level() {
+    local file="$1"
+    local max_check=0
+    
+    # Read all check tags and find the highest number
+    while IFS= read -r line; do
+        if [[ $line =~ ([0-9]+)_check ]]; then
+            current_check="${BASH_REMATCH[1]}"
+            if ((current_check > max_check)); then
+                max_check=$current_check
+            fi
+        fi
+    done < "$file"
+    
+    echo "$max_check"
+}
+
+# Function to update the check level in a file
+update_check_level() {
+    local file="$1"
+    local current_level=$(get_check_level "$file")
+    local next_level=$((current_level + 1))
+    local new_tag="${next_level}_check"
+    
+    if [ "$current_level" = "0" ]; then
+        # Add the first check tag to the YAML front matter
+        sed -i '' "/tags:/a\\
+  - $new_tag" "$file"
+    else
+        # Replace old check tag with new one
+        sed -i '' "s/${current_level}_check/${next_level}_check/" "$file"
+    fi
+
+    return 0
+}
+
+# Check if the directory exists
+if [ ! -d "$ZET_DIR" ]; then
+    echo "Error: Zettelkasten directory not found at $ZET_DIR"
+    exit 1
+fi
+
+# Get all markdown files
+files=("$ZET_DIR"/*.md)
+
+# Select a random file
+random_index=$((RANDOM % ${#files[@]}))
+selected_file="${files[$random_index]}"
+
+# Update the check level
+if update_check_level "$selected_file"; then
+    current_level=$(get_check_level "$selected_file")
+    echo "Opening file for review: $(basename "$selected_file")"
+    echo "This is review #$current_level"
+    nvim "$selected_file"
+else
+    echo "Error updating check level for: $(basename "$selected_file")"
+fi

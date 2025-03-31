@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Check if a subcommand was provided
+if [ $# -eq 0 ]; then
+    echo "Usage: create [cv|app] [dark]"
+    exit 1
+fi
+
+case "$1" in
+    "cv")
+        # Default to light theme unless dark is specified
+        THEME_FILE="cv-style.css"
+        OUTPUT_NAME="cv.pdf"
+        SOURCE_MD="cv.md"
+        TEMPLATE="template.html"
+        
+        if [ "$2" = "dark" ]; then
+            THEME_FILE="cv-style-dark.css"
+            OUTPUT_NAME="cv-dark.pdf"
+        fi
+        ;;
+    "app")
+        # Default to light theme unless dark is specified
+        THEME_FILE="app-style.css"
+        OUTPUT_NAME="app.pdf"
+        SOURCE_MD="app.md"
+        TEMPLATE="app-template.html"
+        
+        if [ "$2" = "dark" ]; then
+            THEME_FILE="app-style-dark.css"
+            OUTPUT_NAME="app-dark.pdf"
+        fi
+        ;;
+    *)
+        echo "Unknown command: $1"
+        echo "Usage: create [cv|app] [dark]"
+        exit 1
+        ;;
+esac
+
+TEMP_HTML="$(mktemp).html"
+
+# Convert markdown to HTML
+pandoc "/Users/renejensen/Dropbox/career/templates/$SOURCE_MD" \
+      -o "$TEMP_HTML" \
+      --metadata charset="utf-8" \
+      --variable lang=en \
+      -s \
+      --template="/Users/renejensen/Dropbox/career/templates/$TEMPLATE"
+
+if [ $? -eq 0 ]; then
+    weasyprint "$TEMP_HTML" "$OUTPUT_NAME" -s "/Users/renejensen/Dropbox/career/templates/$THEME_FILE"
+    rm "$TEMP_HTML"
+    echo "✓ Created $OUTPUT_NAME"
+else
+    echo "Error: Failed to convert markdown to HTML"
+    rm "$TEMP_HTML"
+    exit 1
+fi
