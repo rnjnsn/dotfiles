@@ -1,0 +1,125 @@
+[env]
+TERM = "alacritty"
+
+[window]
+decorations = "none"
+
+[window.padding]
+x = 10
+y = 10
+
+[scrolling]
+history = 10000
+multiplier = 3
+
+[font]
+size = 20
+builtin_box_drawing = true
+
+[font.normal]
+family = "UbuntuMono Nerd Font"
+style = "Regular"
+
+[cursor]
+style = "Block"
+
+[colors.primary]
+background = "#282828"
+foreground = "#EBDBB2"
+
+[colors.normal]
+black   = "#282828"
+red     = "#CC241D"
+green   = "#98971A"
+yellow  = "#D79921"
+blue    = "#458588"
+magenta = "#B16286"
+cyan    = "#689D6A"
+white   = "#A89984"
+
+[colors.bright]
+black   = "#928374"
+red     = "#FB4934"
+green   = "#B8BB26"
+yellow  = "#FABD2F"
+blue    = "#83A598"
+magenta = "#D3869B"
+cyan    = "#8EC07C"
+white   = "#EBDBB2"
+
+# Enable Vi Mode Toggle
+[[keyboard.bindings]]
+key = "V"
+mods = "Control"
+mode = "~Vi"
+action = "ToggleViMode"
+
+[bell]
+animation = "EaseOutExpo"
+duration = 150
+color = "#FB4934"
+
+# Vi Mode Navigation
+[[keyboard.bindings]]
+key = "J"
+mode = "Vi"
+action = "ScrollLineDown"
+
+[[keyboard.bindings]]
+key = "K"
+mode = "Vi"
+action = "ScrollLineUp"
+
+[[keyboard.bindings]]
+key = "G"
+mode = "Vi"
+action = "ScrollToTop"
+
+[[keyboard.bindings]]
+key = "G"
+mods = "Shift"
+mode = "Vi"
+action = "ScrollToBottom"
+
+[[keyboard.bindings]]
+key = "U"
+mods = "Control"
+mode = "Vi"
+action = "ScrollPageUp"
+
+[[keyboard.bindings]]
+key = "D"
+mods = "Control"
+mode = "Vi"
+action = "ScrollPageDown"
+
+[[keyboard.bindings]]
+key = "Y"
+mode = "Vi"
+action = "Copy"
+
+[[keyboard.bindings]]
+key = "V"
+mode = "Vi"
+action = "ToggleNormalSelection"
+
+[[keyboard.bindings]]
+key = "Escape"
+mode = "Vi"
+action = "ToggleViMode"
+
+[[keyboard.bindings]]
+key = "/"
+mode = "Vi"
+action = "SearchForward"
+
+[[keyboard.bindings]]
+key = "N"
+mode = "Vi"
+action = "SearchNext"
+
+[[keyboard.bindings]]
+key = "N"
+mods = "Shift"
+mode = "Vi"
+action = "SearchPrevious"
