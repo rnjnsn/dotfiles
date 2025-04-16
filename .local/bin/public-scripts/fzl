@@ -1,0 +1,24 @@
+#!/bin/bash
+
+cd "$HOME/docs/lit" || exit
+
+file=$(fd --type f | fzf \
+  --preview 'bat --color=always {} || cat {}' \
+  --bind='right:accept')
+
+[ -z "$file" ] && exit
+
+case "$file" in
+  *.pdf)
+    setsid zathura "$file" >/dev/null 2>&1 & ;;
+  *.jpg|*.jpeg|*.png|*.gif)
+    setsid sxiv "$file" >/dev/null 2>&1 & ;;
+  *.mp4|*.mkv|*.webm)
+    setsid mpv "$file" >/dev/null 2>&1 & ;;
+  *.mp3|*.flac|*.wav|*.ogg)
+    setsid mpv --no-video "$file" >/dev/null 2>&1 & ;;
+  *.md|*.txt|*.sh|*.py|*.c|*.cpp|*.js|*.ts|*.json|*.html|*.css)
+    nvim "$file" ;;
+  *)
+    xdg-open "$file" >/dev/null 2>&1 & ;;
+esac

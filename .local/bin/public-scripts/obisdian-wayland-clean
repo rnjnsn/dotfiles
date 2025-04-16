@@ -1,0 +1,4 @@
+#!/bin/bash
+export NATIVE_WAYLAND=1
+export ELECTRON_OZONE_PLATFORM_HINT=auto
+exec obsidian --ozone-platform=wayland --enable-features=UseOzonePlatform

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+fd --type d | fzf \
+  --preview 'tree -C {} | head -n 20' \
+  --bind='right:execute(lf -command "cd {}")+abort'

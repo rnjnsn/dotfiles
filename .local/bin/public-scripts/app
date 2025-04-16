@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# ---------------------------------------
+# Resume Builder Script
+# Converts a Markdown resume into a styled PDF using Pandoc and WeasyPrint
+# ---------------------------------------
+
+set -e  # Exit immediately on error
+
+# Log output to a temporary file for debugging
+exec > /tmp/resume-build.log 2>&1
+
+# Base directory (absolute, using $HOME)
+BASE_DIR="$HOME/docs/career/resumebuilder"
+
+# File paths
+MD_FILE="$BASE_DIR/app.md"
+TEMPLATE="$BASE_DIR/templates/app-template.html"
+CSS="$BASE_DIR/app.css"
+OUTPUT_PDF="$BASE_DIR/app.pdf"
+TEMP_HTML="$(mktemp --suffix=.html)"
+
+# Check if Markdown source exists
+if [ ! -f "$MD_FILE" ]; then
+    echo "❌ Markdown file not found: $MD_FILE"
+    notify-send "Resume Builder" "❌ Markdown file missing!" 2>/dev/null || true
+    exit 1
+fi
+
+# Convert Markdown to temporary HTML
+if pandoc "$MD_FILE" \
+    -o "$TEMP_HTML" \
+    --metadata charset="utf-8" \
+    --variable lang=en \
+    -s \
+    --template="$TEMPLATE"; then
+
+    # Convert HTML to PDF
+    weasyprint "$TEMP_HTML" "$OUTPUT_PDF" -s "$CSS"
+    rm -f "$TEMP_HTML"
+
+    echo "✅ PDF created at: $OUTPUT_PDF"
+    notify-send "Resume Builder" "✅ PDF created successfully!" 2>/dev/null || true
+else
+    echo "❌ Error: Failed to convert Markdown to HTML"
+    notify-send "Resume Builder" "❌ Markdown to HTML failed!" 2>/dev/null || true
+    rm -f "$TEMP_HTML"
+    exit 1
+fi

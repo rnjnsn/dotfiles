@@ -1,0 +1,67 @@
+#!/bin/bash
+# Set the Zettelkasten directory
+ZET_DIR="$HOME/notes/3. zettelkasten"
+
+# Function to convert title to lowercase and convert spaces to hyphens for filename
+sanitize_filename() {
+    echo "$1" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:] ' | tr ' ' '-'
+}
+
+# Function to convert title to Title Case for content
+title_case() {
+    echo "$1" | awk 'BEGIN{FS=OFS=" "} {for(i=1;i<=NF;i++)sub(/./,toupper(substr($i,1,1)),$i)}1'
+}
+
+# Check if the directory exists
+if [ ! -d "$ZET_DIR" ]; then
+    echo "Error: Zettelkasten directory not found at $ZET_DIR"
+    exit 1
+fi
+
+# Get the title from user input
+echo -n "Enter note title: "
+read input_title
+
+# Create filename version (lowercase with hyphens)
+filename_title=$(sanitize_filename "$input_title")
+
+# Create content version (Title Case)
+content_title=$(title_case "$input_title")
+
+# Get additional tags from user input
+echo -n "Enter additional tags (space-separated): "
+read additional_tags
+
+# Combine default tags with additional tags
+all_tags="resources zettelkasten $additional_tags"
+
+# Convert space-separated tags to YAML array format
+yaml_tags=$(echo "$all_tags" | sed 's/[[:space:]]\+/\n  - /g')
+
+# Create filename using the hyphenated version
+filename="$ZET_DIR/$filename_title.md"
+
+# Create the note with template using the Title Case version
+cat > "$filename" << EOL
+---
+title: "$content_title"
+created: $(date '+%Y-%m-%d %H:%M:%S')
+tags:
+  - ${yaml_tags}
+---
+## $content_title
+
+
+## Connections
+
+
+## Sources
+
+
+## Questions
+
+
+EOL
+echo "Created note: $filename"
+# Open the file in nvim
+nvim "$filename"

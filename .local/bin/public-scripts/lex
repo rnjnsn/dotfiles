@@ -1,0 +1,86 @@
+#!/bin/zsh
+
+# Set the Word Collection directory
+WORD_DIR="$HOME/notes/6. lexicon"
+
+
+# Function to convert title to lowercase and keep spaces
+sanitize_title() {
+    echo "$1" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:] '
+}
+
+# Check if the directory exists
+if [ ! -d "$WORD_DIR" ]; then
+    echo "Error: Word collection directory not found at $WORD_DIR"
+    exit 1
+fi
+
+# Get the word/phrase from user input
+echo -n "Enter word or phrase: "
+read title
+title=$(sanitize_title "$title")
+
+# Get the part of speech
+echo -n "Enter part of speech (noun/verb/adj/adv/phrase): "
+read part_of_speech
+
+# Get the language of origin (if known)
+echo -n "Enter language of origin (if known): "
+read etymology
+
+# Get additional tags for categorization
+echo -n "Enter categories (space-separated, e.g., formal slang technical): "
+read additional_tags
+
+# Combine default tags with additional tags
+all_tags="vocabulary lexicon ${part_of_speech} ${additional_tags}"
+
+# Convert space-separated tags to YAML array format
+yaml_tags=$(echo "$all_tags" | sed 's/[[:space:]]\+/\n  - /g')
+
+# Create filename using the word/phrase
+filename="$WORD_DIR/$title.md"
+
+# Create the note with template
+cat > "$filename" << EOL
+---
+word: "$title"
+id: $(date +%Y%m%d%H%M%S)
+created: $(date '+%Y-%m-%d %H:%M:%S')
+part_of_speech: "$part_of_speech"
+etymology: "$etymology"
+tags:
+  - ${yaml_tags}
+---
+# $title
+
+## definition
+provide a clear, precise definition of the word or phrase
+
+## usage examples
+* example sentence 1
+* example sentence 2
+* example sentence 3
+
+## connotations & context
+describe any special connotations, cultural context, or usage notes
+
+## related terms
+* synonyms:
+* antonyms:
+* related phrases:
+
+## etymology & history
+detailed etymology or historical development of the term
+
+## personal notes
+why this word/phrase is interesting or useful to you
+
+## sources
+reference materials, books, or contexts where you encountered this term
+EOL
+
+echo "Created lexicon entry: $filename"
+
+# Open the file in nvim
+nvim "$filename"
