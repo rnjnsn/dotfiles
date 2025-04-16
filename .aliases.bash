@@ -64,3 +64,5 @@ alias djoefen="zathura /Users/renejensen/Dropbox/career/guides/djoef-app-en.pdf"
 # Apps
 alias lf=lfub
 
+alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles --work-tree=$HOME'
+alias privdot='/usr/bin/git --git-dir=$HOME/.dotfiles-private --work-tree=$HOME'

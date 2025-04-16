@@ -15,8 +15,6 @@ export CLICOLOR=1
 export HRULEWIDTH=73
 export LC_COLLATE=C
 
-[[ -z $DISPLAY && $XDG_VTNR -eq 1 ]] && exec Hyprland
-
 # Path manipulation functions
 pathappend() {
     declare arg
@@ -173,10 +171,6 @@ alias .....="cd ../../../.."
 # Source FZF
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
-# Source personal configurations if they exist
-_source_if "$HOME/.bash_personal"
-_source_if "$HOME/.bash_private"
-
 # Source aliases file
 [ -f ~/.aliases.bash ] && source ~/.aliases.bash
 
@@ -204,6 +198,7 @@ export FZF_DEFAULT_OPTS="--preview='bat --color=always {} || cat {}' \
   --height=100% \
   --layout=reverse \
   --border"
-alias fzopen="~/.local/bin/fzopen"
-alias fzd="~/.local/bin/fzd"
-alias fzl="~/.local/bin/fzl"
+alias fzfopen="~/.local/bin/public-scripts/fzfopen"
+alias fzd="~/.local/bin/public-scripts/fzd"
+alias fzl="~/.local/bin/public-scripts/fzl"
+
