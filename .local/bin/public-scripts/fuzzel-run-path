@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Show everything in PATH
+cmd=$(compgen -c | sort -u | fuzzel --dmenu -p "Run:")
+
+if [ -n "$cmd" ]; then
+    setsid "$cmd" >/dev/null 2>&1 &
+fi
+
