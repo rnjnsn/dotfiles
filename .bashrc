@@ -37,17 +37,24 @@ pathprepend() {
     done
 } && export -f pathprepend
 
-# Combine all path configurations
+# Combine all PATH configurations
+
 pathprepend \
     "$HOME/.local/bin" \
     "$HOME/bin" \
     "$HOME/.local/go/bin" \
     "$GHREPOS/cmd-"*
 
+# Add custom script directories to PATH
+pathprepend \
+    "$HOME/.local/bin/public-scripts" \
+    "$HOME/.local/bin/private-scripts"
+
 # Go configuration
 export GOPATH=$HOME/go
 export GOBIN=$GOPATH/bin
 pathappend "$GOBIN"
+
 
 # Additional paths
 pathappend \
@@ -151,7 +158,7 @@ PROMPT_COMMAND="__ps1"
 
 # ------------------------------ aliases -----------------------------
 
-unalias -a
+#unalias -a
 alias ls='ls -h --color=auto'
 alias tree='tree -a'
 alias df='df -h'
@@ -184,13 +191,13 @@ alias .....="cd ../../../.."
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
 # Start tmux if it's installed and not already running
-if [ -x "$(command -v tmux)" ] && [ -n "${DISPLAY}" ] && [ -z "${TMUX}" ]; then
+#if [ -x "$(command -v tmux)" ] && [ -n "${DISPLAY}" ] && [ -z "${TMUX}" ]; then
     # Attach to a session or create a new one
-    exec tmux new-session -A -s ${USER} >/dev/null 2>&1
-fi
+#    exec tmux new-session -A -s ${USER} >/dev/null 2>&1
+#fi
 
 # Add custom scripts directory to PATH
-alias lf=~/.local/bin/lfub
+alias lf=~/.local/bin/public-scripts/lfub
 
 # FZF launcher setup 
 export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
@@ -202,3 +209,4 @@ alias fzfopen="~/.local/bin/public-scripts/fzfopen"
 alias fzd="~/.local/bin/public-scripts/fzd"
 alias fzl="~/.local/bin/public-scripts/fzl"
 
+export MOZ_ENABLE_WAYLAND=1
