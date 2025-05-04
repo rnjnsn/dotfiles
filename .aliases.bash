@@ -35,6 +35,10 @@ alias \
     e="$EDITOR" \
     v="$EDITOR"
 
+# File finder aliases
+alias ff='~/.local/bin/public-scripts/ffd -f -p -e' # Find and open files
+alias fd='~/.local/bin/public-scripts/ffd -d -p' # Find directories
+
 # Directory navigation
 alias ..="cd .."
 alias ...="cd ../.."
@@ -44,25 +48,30 @@ alias ~="cd ~"
 alias -- -="cd -"
 
 # Personal shortcuts
-alias d="cd ~/Dropbox"
-alias dl="cd ~/Downloads"
+alias c="cd ~/.config"
+alias dl="cd ~/downloads"
 alias dt="cd ~/Desktop"
-alias c="cd /Users/renejensen/.config"
 alias p="cd ~/projects"
 alias g="git"
-alias z='cd ~/Google\ Drive/My\ Drive/rnjnsn/3.\ zettelkasten'
-alias w="cd /Users/renejensen/rnjnsn-website"
-alias wc="cd /Users/renejensen/rnjnsn-website/content"
-alias wl="cd /Users/renejensen/rnjnsn-website/layouts"
-alias wac="cd /Users/renejensen/rnjnsn-website/assets/css"
-alias wab="nvim /Users/renejensen/rnjnsn-website/layouts/about/index.html"
-alias wco="cd /Users/renejensen/rnjnsn-website/layouts/contact/index.html"
-alias wre="cd /Users/renejensen/rnjnsn-website/layouts/resources/index.html"
+alias h="nvim ~/.config/hypr/hyprland.conf"
+alias s="cd ~/.local/bin/public-scripts"
+alias z='cd ~\notes/3.\ zettelkasten'
+alias w="cd ~/projects/rnjnsn-website"
+alias wc="cd ~/projects/rnjnsn-website/content"
+alias wl="cd ~/projects/rnjnsn-website/layouts"
+alias wac="cd ~/projects/rnjnsn-website/static/css"
+alias wab="nvim ~/projects/rnjnsn-website/layouts/about/index.html"
+alias wco="nvim ~/projects/rnjnsn-website/layouts/contact/index.html"
+alias wre="nvim ~/projects/rnjnsn-website/layouts/resources/index.html"
 alias djoefda="zathura /Users/renejensen/Dropbox/career/guides/djoef-app-da.pdf"
 alias djoefen="zathura /Users/renejensen/Dropbox/career/guides/djoef-app-en.pdf"
 
 # Apps
-alias lf=lfub
+alias lf="lfub"
+alias vim="nvim"
+alias vi="nvim"
+alias ncd="nordvpn connect denmark"
+alias ncd="nordvpn connect germany"
 
 alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles --work-tree=$HOME'
 alias privdot='/usr/bin/git --git-dir=$HOME/.dotfiles-private --work-tree=$HOME'

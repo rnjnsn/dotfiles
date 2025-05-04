@@ -11,7 +11,7 @@ set -e  # Exit immediately on error
 exec > /tmp/cv-build.log 2>&1
 
 # Base directory (absolute, using $HOME)
-BASE_DIR="$HOME/docs/career"
+BASE_DIR="$HOME/docs/career/resumebuilder"
 
 # File paths
 MD_FILE="$BASE_DIR/cv.md"

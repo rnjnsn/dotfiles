@@ -53,7 +53,7 @@ cmd open ${{
 		("/dev/tty"*) # En tty imágenes pueden ser mostradas con mpv
 			"${MPV:-mpv}" --keep-open $fx
 		;;
-		(*) dem "${IMAGE_VIEWER:-vimiv}" $fx
+		(*) dem "${IMAGE_VIEWER:-imv}" $fx
 		esac
 	;;
 	(audio/*)

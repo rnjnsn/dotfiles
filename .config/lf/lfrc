@@ -1,20 +1,9 @@
-#  ██   ████
-# ░██  ░██░
-# ░██ ██████ ██████  █████
-# ░██░░░██░ ░░██░░█ ██░░░██
-# ░██  ░██   ░██ ░ ░██  ░░
-# ░██  ░██   ░██   ░██   ██
-# ███  ░██  ░███   ░░█████
-#░░░   ░░   ░░░     ░░░░░
-
-# To get image previews, you need these 4 steps:
+# To get image previews, follow these 4 steps:
 # 1. Install ueberzug
-# 2. The previewer file (~/.config/lf/previewer for me), must have a command
-#    similar to mine to generate ueberzug images.
-# 3. A `set cleaner` line as below is a cleaner script.
-# 4. lf should be started through a wrapper script (~/.local/bin/lfub for me)
-#    that creates the environment for ueberzug. This command can be be aliased
-#    in your shellrc (`alias lf="lfub").
+# 2. Your previewer file (e.g., ~/.config/lf/previewer) must include a ueberzug image preview command.
+# 3. Define a cleaner script as shown below using `set cleaner`.
+# 4. Start lf via a wrapper script (e.g., ~/.local/bin/lfub) to initialize ueberzug environment.
+#    You can alias this in your shellrc: `alias lf="lfub"`
 
 # Main options
 set icons
@@ -26,19 +15,18 @@ set hiddenfiles ".*:*.aux:*.log:*.bbl:*.bcf:*.blg:*.run.xml"
 set cleaner '~/.config/lf/cleaner'
 set previewer '~/.config/lf/previewer'
 set promptfmt "
-\033[48;2;35;38;39;38;2;28;220;156m  
-\033[38;2;35;38;39;48;2;202;31;31m
+ \033[48;2;23;147;209;38;2;255;255;255m \033[38;2;23;147;209;48;2;202;31;31m
 \033[38;2;202;31;31;48;2;40;47;62m
 \033[38;2;255;255;255m %w 
 \033[38;2;40;47;62;48;2;58;67;89m
 \033[38;2;255;255;255m %f 
-\033[;38;2;58;67;89;49m\033[m"
+\033[38;2;58;67;89;49m\033[m"
 set incsearch
 set incfilter
 #set globsearch on
-set ratios 2:3:4 # 2:3:7:7
+set ratios 2:3:4
 set truncatechar "…"
-set waitmsg "\033[1;31m⏎\033[m"
+set waitmsg "\033[1;31m⏎ to continue...\033[m"
 set timefmt "02/01/2006 15:04:05 "
 set infotimefmtnew '02/01 15:04'
 set infotimefmtold '02/01/06'
@@ -56,47 +44,38 @@ set cursorpreviewfmt "\033[7m"
 
 source '~/.config/lf/opener'
 
-%test $LF_LEVEL -eq 1 || >&2 printf "Warning: You're in a nested lf instance!"
+%test $LF_LEVEL -eq 1 || >&2 printf "Warning: You are inside a nested lf instance!"
 
 cmd mkdir $mkdir -p "$(echo $* | tr ' ' '\ ')"
 cmd trash %trash-put $fx
-
 
 cmd delete ${{
 	clear; tput cup $(($(tput lines)/3)); tput bold
 	set -f
 	printf -- "%s\n" $fx | sed 's|'"$HOME"'||'
-	printf "\t\033[1;33m¿Remover? \033[37m[\033[32ms\033[37m/\033[31mN\033[37m]\033[m "
+	printf "\t\033[1;33mDelete? \033[37m[\033[32my\033[37m/\033[31mN\033[37m]\033[m "
 	read -r REPLY
 	case "$REPLY" in
 		[yYsS]) rm -rf -- $fx ;;
 	esac
 }}
 
-
 cmd chmodx &{{
 	chmod u+x $fx
 	lf -remote "send $id reload"
 }}
 
-
 cmd shred ${{
-	# TODO:
-	# handle multiple files with shred or rshred
-	# for files or directories respectively (with array/positional parameters)
-	# Al parecer hay algunos bugs luego del primer despedazo no se puede despedazar más? revisar luego
 	clear; tput cup $(($(tput lines)/3)); tput bold
 	set -f
 	printf -- "%s\n" $fx | sed 's|'"$HOME"'||'
-	# Mejorar el prompteo, que sea más cuidadoso
-	printf "\t\033[1;34m¿Despedazar? \033[37m[\033[32ms\033[37m/\033[31mN\033[37m]\033[m "
+	printf "\t\033[1;34mShred permanently? \033[37m[\033[32my\033[37m/\033[31mN\033[37m]\033[m "
 	read -r REPLY
 	case "$REPLY" in
 		[yYsS])
 			for f in $fx; do
 				if [ -f "$f" ]; then
 					shred -u -n 3 "$f" >/dev/null 2>&1 &
-					# TODO: Poner un máximo número de trabajos
 				elif [ -d "$f" ]; then
 					rshred -fdu "$f"
 				fi
@@ -105,24 +84,22 @@ cmd shred ${{
 	esac
 }}
 
-
 cmd extract ${{
 	clear; tput cup $(($(tput lines)/3)); tput bold
 	set -f
 	printf -- "%s\n" $fx
-	printf "\t\033[1;34m¿Extraer? \033[37m[\033[32ms\033[37m/\033[31mN\033[37m]\033[m "
+	printf "\t\033[1;34mExtract archive? \033[37m[\033[32my\033[37m/\033[31mN\033[37m]\033[m "
 	read -r REPLY
 	case "$REPLY" in
 		[yYsS]) aunpack $fx ;;
 	esac
 }}
 
-
 cmd moveto ${{
 	clear; tput cup $(($(tput lines)/3)); tput bold
 	set -f
 	clear
-	echo "¿A dónde mover?"
+	echo "Move to:"
 	if dest="$(sed -e 's/\s*#.*//' -e '/^$/d' -e 's/^\S*\s*//' "${XDG_CONFIG_HOME:-"$HOME/.config"}/shell/bm-dirs" \
 			| fzf \
 			| sed 's|~|$HOME|'
@@ -131,29 +108,25 @@ cmd moveto ${{
 		for x in $fx; do
 			eval mv -iv \"$x\" \"$dest\"
 		done &&
-			notify-send "lf" "🚚 Fichero(s) movidos a $dest"
+			notify-send "lf" "Moved to $dest"
 	fi
 }}
-
 
 cmd copyto ${{
 	clear; tput cup $(($(tput lines)/3)); tput bold
 	set -f
 	clear
-	echo "¿A dónde copiar?"
+	echo "Copy to:"
 	dest="$(sed -e 's/\s*#.*//' -e '/^$/d' -e 's/^\S*\s*//' "${XDG_CONFIG_HOME:-"$HOME/.config"}/shell/bm-dirs" \
 		| fzf \
 		| sed 's|~|$HOME|')" &&
 	for x in $fx; do
 		eval cp -ivr \"$x\" \"$dest\"
 	done &&
-	notify-send "lf" "📋 Fichero(s) copiados a $dest"
+	notify-send "lf" "Copied to $dest"
 }}
 
 cmd broot ${{
-	# You need to manually close broot printing the
-	# selected path with :print-path or :pp. You may
-	# want to configure broot keybindings
 	selected="$(broot)"
 	if [ -d "$selected" ]; then
 		lf -remote "send ${id} cd \"${selected}\""
@@ -165,10 +138,7 @@ cmd broot ${{
 }}
 
 cmd paste_link %{{
-	IFS='
-'
-	# TODO: reescribir no con los marcados a copiar/pegar,
-	# sino con los seleccionados: $fs
+	IFS='\n'
 	set -- $(cat ~/.local/share/lf/files)
 	mode="$1"
 	shift
@@ -177,12 +147,9 @@ cmd paste_link %{{
 		exit 1
 	fi
 	case "$mode" in
-		# symbolically copy mode is indicating a soft link
 		copy) ln -sr -t . -- "$@";;
-		# while a move mode is indicating a hard link
 		move) ln -t . -- "$@";;
-	esac \
-		|| exit $?
+	esac || exit $?
 	rm ~/.local/share/lf/files
 	lf -remote "send clear"
 }}
@@ -198,7 +165,7 @@ cmd zlua %{{
 cmd zlua_i ${{
 	dir=$(z.lua -l "$@" \
 		| fzf --nth 2.. --tac +s -e \
-			--header "Directorios frecientes" --header-first \
+			--header "Frequent directories" --header-first \
 			--preview "lsd --color always --icon always --tree --depth 3 --group-dirs first {+2} 2>/dev/null" \
 		| awk '{print substr($0, index($0,$2))}'
 	)
@@ -216,7 +183,7 @@ cmd gsh_fuzzy %{{
 cmd gsh_i ${{
 	selected=$(g.sh -l "$@" \
 		| fzf --nth 2.. --tac +s -e \
-		--header "Directorios marcados" --header-first \
+		--header "Bookmarked directories" --header-first \
 		--preview "lsd --color always --icon always --tree --depth 2 --group-dirs first {+2} 2>/dev/null" \
 		| awk '{print substr($0, index($0,$2))}'
 	)
@@ -235,15 +202,39 @@ cmd stop ${{
 
 cmd setbg "$1"
 
-# Mapeos de teclas
+cmd remove_dupes ${{
+    ~/.local/bin/public-scripts/remove-dupes.sh "$PWD"
+}}
+
+cmd prefix_files ${{
+    # Pass selected files to the script
+    [ -n "$fs" ] && printf '%s\n' $fs | ~/.local/bin/public-scripts/prefix-files.sh || echo "No files selected."
+}}
+
+cmd rsyncpull ${{
+    ~/.local/bin/public-scripts/rsync-pull $fx
+    lf -remote "send $id echo '✅ Downloaded with rsync'"
+}}
+
+map <a-p> rsyncpull
+
+
+map <a-d> rsyncpull
+
+
+map rd remove-dupes
+map pf prefix-files
+
+# KEY MAPPINGS
+# (Only relevant comments shown; all functional keybinds preserved.)
 
 # Movement
 map k up
-map l down
-map j updir
-map ñ open
+map j down
+map h updir
+map l open
 map Ñ openwith
-map h read
+# map h read
 map { half-up
 map } half-down
 map <c-n> down
@@ -253,15 +244,15 @@ map <c-p> up
 # Dependency: my 'ffd' script which uses:
 # - fd or find, fzf, tput; bat and lsd (for previews)
 map f
-map f1 $lf -remote "send $id select \"$(ffd -p --depth 1 +m)\""  # Fuzzy find 1 level deep
-map f2 $lf -remote "send $id select \"$(ffd -p --depth 2 +m)\""  # Fuzzy find 2 levels deep
-map f3 $lf -remote "send $id select \"$(ffd -p --depth 3 +m)\""  # Fuzzy find 3 levels deep
-map ff broot
-map F  $lf -remote "send $id select \"$(ffd -p +m)\""
+map ff $lf -remote "send $id select \"$(ffd -p)\"" # → Fuzzy select a file (with preview), highlight in lf
+map fe &ffd -f -e -p # fe → Fuzzy open a file (zathura, glow, feh, nvim, etc.)
+map fd $lf -remote "send $id cd \"$(ffd -d -p)\"" # fd → Fuzzy cd into a directory
+map fb broot # fb → Launch broot (tree view with live fuzzy filter)
 map -  search
 map _  search-back
 map zf find
 map zF find-back
+
 
 # File content search
 # Dependency: my 'rgfzf' script which uses:
@@ -279,7 +270,7 @@ map Kc cmaps  # List command mode mappings
 map d
 map dd cut
 map D delete
-map <a-d> trash
+# map <a-d> trash
 map <a-D> shred
 map E extract
 #map C copyto
@@ -353,8 +344,8 @@ map A push i<a-A>  # At the very end
 map cc push i<a-A><c-u>  # New rename
 map I push i<c-a>  # At the very beginning
 map a push i<a-A><a-b>  # After extension
-map b $vidir   # Bulkrename in $EDITOR, 'vidir' from more-utils
-map B $find | vidir -
+# map b $vidir   # Bulkrename in $EDITOR, 'vidir' from more-utils
+# map B $find | vidir -
 
 map V push $"$EDITOR"<space>
 

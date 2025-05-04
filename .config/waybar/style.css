@@ -1,15 +1,15 @@
 * {
-  font-family: monospace;
-  font-size: 13px;
-  border: 1px solid transparent;
-  padding: 0 6px;
+  font-family: 'Ubuntu Nerd Font Mono', monospace;
+  font-size: 12px;
+  font-weight: bold;
 }
 
 window#waybar {
-  background-color: rgba(0, 0, 0, 0);
+  background-color: #222222;
   color: #bbbbbb;
 }
 
+/* Workspaces */
 #workspaces button {
   padding: 0px;
   color: #bbbbbb;
@@ -19,18 +19,33 @@ window#waybar {
 }
 
 #workspaces button.active {
-  color: #ffffff;
-  background: #eb422a;
+  color: #eeeeee;
+  background: #005577;
 }
 
 #workspaces button.urgent {
   color: #ffffff;
-  background: #eb442a;
+  background: #ff0000;
 }
 
+/* Window title */
+#window {
+  color: #bbbbbb;
+  margin-left: 40px; /* keep your spacing */
+  padding: 0 6px;
+}
+
+/* Right-side modules */
 #clock,
 #cpu,
 #memory,
-#window {
+#battery {
   color: #bbbbbb;
+  margin-left: 40px;
 }
+
+/* Extra spacing at far right (matches workspace spacing) */
+#clock {
+  padding-right: 10px; /* tweak this to match workspace left margin */
+}
+

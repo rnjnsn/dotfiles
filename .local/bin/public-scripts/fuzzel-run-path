@@ -1,9 +1,40 @@
 #!/bin/bash
 
-# Show everything in PATH
-cmd=$(compgen -c | sort -u | fuzzel --dmenu -p "Run:")
+# Source the bookmarks file
+source "$HOME/.local/bin/public-scripts/bookmarks"  # Adjust path as needed
 
-if [ -n "$cmd" ]; then
-    setsid "$cmd" >/dev/null 2>&1 &
+# Get programs from PATH
+programs=$(compgen -c | sort -u)
+
+# Get bookmarks from the sourced file
+bookmarks=$(get_all_bookmarks)
+
+# Combine programs and bookmarks
+all_options="$programs"$'\n'"$bookmarks"
+
+# Show fuzzel menu and get selection
+selected=$(echo "$all_options" | fuzzel --dmenu -p "Run/Open:")
+
+# Exit if nothing was selected
+if [ -z "$selected" ]; then
+    exit 0
+fi
+
+# Check if selection is a bookmark (starts with category prefix)
+if [[ "$selected" == AI:* || "$selected" == News:* || "$selected" == Social:* ]]; then
+    # Get URL using the function from bookmarks file
+    url=$(get_bookmark_url "$selected")
+    
+    # Check if Firefox is running
+    if pgrep -x firefox > /dev/null; then
+        # Firefox is running, open URL in a new tab
+        firefox --new-tab "$url" &
+    else
+        # Firefox is not running, start a new instance
+        firefox "$url" &
+    fi
+else
+    # It's a command, execute it
+    setsid "$selected" >/dev/null 2>&1 &
 fi
 

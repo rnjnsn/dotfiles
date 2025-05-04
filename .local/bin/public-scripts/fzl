@@ -1,13 +1,9 @@
 #!/bin/bash
-
 cd "$HOME/docs/lit" || exit
-
 file=$(fd --type f | fzf \
   --preview 'bat --color=always {} || cat {}' \
-  --bind='right:accept')
-
+  --bind='ctrl-l:accept,right:accept')
 [ -z "$file" ] && exit
-
 case "$file" in
   *.pdf)
     setsid zathura "$file" >/dev/null 2>&1 & ;;

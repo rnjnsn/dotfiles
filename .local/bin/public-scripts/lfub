@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Envolvedor de lf, que permite crear previsualizaciones de imágenes
 # con ueberzug, en conjunto con mi configuración 'previewer' y 'cleaner' para lf
 # Taken from: https://github.com/LukeSmithxyz/voidrice/blob/master/.local/bin/lfub

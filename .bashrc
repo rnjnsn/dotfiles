@@ -10,6 +10,7 @@ export LC_NUMERIC=de_DE.UTF-8
 export USER="${USER:-$(whoami)}"
 export EDITOR=nvim
 export GIT_EDITOR=$EDITOR
+export IMAGE_VIEWER=imv
 export TZ=Europe/Berlin
 export CLICOLOR=1
 export HRULEWIDTH=73
@@ -68,6 +69,21 @@ pathappend \
 
 
 # ------------------- helper functions -------------------
+
+# broot integration
+function br {
+    local cmd cmd_file code
+    cmd_file=$(mktemp)
+    if broot --outcmd "$cmd_file" "$@"; then
+        cmd=$(<"$cmd_file")
+        command rm -f "$cmd_file"
+        eval "$cmd"
+    else
+        code=$?
+        command rm -f "$cmd_file"
+        return "$code"
+    fi
+}
 
 # Check if a command exists
 _have() {
@@ -162,17 +178,6 @@ PROMPT_COMMAND="__ps1"
 alias ls='ls -h --color=auto'
 alias tree='tree -a'
 alias df='df -h'
-alias vim='nvim'
-alias vi='nvim'
-alias cp="cp -iv"
-alias mv="mv -iv"
-alias rm="rm -v"
-alias mkd="mkdir -pv"
-alias ..="cd .."
-alias ...="cd ../.."
-alias ....="cd ../../.."
-alias .....="cd ../../../.."
-
 # ------------------------- source extras --------------------------
 
 # Source FZF
@@ -210,3 +215,5 @@ alias fzd="~/.local/bin/public-scripts/fzd"
 alias fzl="~/.local/bin/public-scripts/fzl"
 
 export MOZ_ENABLE_WAYLAND=1
+
+source /home/rene/.config/broot/launcher/bash/br
