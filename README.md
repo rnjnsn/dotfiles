@@ -1,6 +1,6 @@
 # My Dotfiles
 
-These are the dotfiles I use on my personal Linux setup. Feel free to explore, fork, or borrow anything you find useful.
+These are the dotfiles I use on my personal Linux setup. Feel free to explore, fork, or borrow anything you find useful. 
 
 ## About
 
@@ -9,9 +9,9 @@ This setup is tailored for a minimal, keyboard-focused workflow running on:
 - **Arch Linux**
 - **Hyprland**
 - **Lenovo ThinkPad X1 Carbon Gen 13**
-- **HHKB (Happy Hacking Keyboard)** 
+- **HHKB (Happy Hacking Keyboard)**
 
-I manage them using the **bare Git repo method**.
+I manage my dotfiles using the **bare Git repo method**.
 
 ## Shameless Theft
 
