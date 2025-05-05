@@ -63,8 +63,6 @@ alias wac="cd ~/projects/rnjnsn-website/static/css"
 alias wab="nvim ~/projects/rnjnsn-website/layouts/about/index.html"
 alias wco="nvim ~/projects/rnjnsn-website/layouts/contact/index.html"
 alias wre="nvim ~/projects/rnjnsn-website/layouts/resources/index.html"
-alias djoefda="zathura /Users/renejensen/Dropbox/career/guides/djoef-app-da.pdf"
-alias djoefen="zathura /Users/renejensen/Dropbox/career/guides/djoef-app-en.pdf"
 
 # Apps
 alias lf="lfub"
