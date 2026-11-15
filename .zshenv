@@ -17,7 +17,6 @@ export HRULEWIDTH=73
 
 # Wayland
 export XDG_SESSION_TYPE=wayland
-export WAYLAND_DISPLAY=wayland-1
 export MOZ_ENABLE_WAYLAND=1
 
 # Languages
