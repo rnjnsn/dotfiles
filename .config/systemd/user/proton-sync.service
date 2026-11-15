@@ -1,0 +1,9 @@
+[Unit]
+Description=Proton Drive Sync (docs/lit and docs/audiobooks)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/rene/.local/bin/proton-sync.sh
+StandardOutput=journal
+StandardError=journal

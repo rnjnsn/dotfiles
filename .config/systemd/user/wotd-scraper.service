@@ -1,0 +1,8 @@
+[Unit]
+Description=WOTD daily scraper
+
+[Service]
+Type=oneshot
+ExecStart=/home/rene/.pyenv/versions/3.11.9/bin/python3 /home/rene/.config/waybar/scripts/scraper.py
+ExecStartPost=/bin/bash -c 'pkill -RTMIN+8 waybar 2>/dev/null || true'
+Environment=DISPLAY=:0

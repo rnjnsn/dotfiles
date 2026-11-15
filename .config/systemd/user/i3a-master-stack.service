@@ -1,0 +1,6 @@
+[Unit]
+Description=i3a-master-stack
+
+[Service]
+ExecStart=/home/rene/.local/bin/i3a-master-stack --stack=dwm --stack-size=35
+Restart=on-failure

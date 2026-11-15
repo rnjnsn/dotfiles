@@ -4,3 +4,4 @@
 [[ -f ~/.profile ]] && . ~/.profile
 
 source /home/rene/.config/broot/launcher/bash/br
+. "$HOME/.cargo/env"

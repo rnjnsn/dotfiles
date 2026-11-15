@@ -1,7 +1,7 @@
 return {
     "iamcco/markdown-preview.nvim",
     build = function() vim.fn["mkdp#util#install"]() end,
-    cmd = { "MarkdownPreview", "MarkdownPreviewToggle", "MarkdownPreviewStop" },
+    cmd = { "MarkdownPreviewStart", "MarkdownPreviewToggle", "MarkdownPreviewStop" },
     ft = { "markdown" },
     config = function()
         vim.g.mkdp_auto_start = 0      -- Do not auto-start preview

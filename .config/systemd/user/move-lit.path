@@ -1,0 +1,7 @@
+[Unit]
+Description=Watch ~/downloads for PDFs and EPUBs
+[Path]
+PathChanged=%h/downloads
+Unit=move-lit.service
+[Install]
+WantedBy=default.target

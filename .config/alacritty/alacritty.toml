@@ -1,9 +1,12 @@
 [env]
 TERM = "alacritty"
 
+[terminal.shell]
+program = "/bin/bash"
+args = ["-l", "-c", "tmux new-session -s $$"]
+
 [window]
 decorations = "none"
-
 [window.padding]
 x = 10
 y = 10
@@ -13,39 +16,54 @@ history = 10000
 multiplier = 3
 
 [font]
-size = 20
+size = 22
 builtin_box_drawing = true
-
 [font.normal]
-family = "UbuntuMono Nerd Font"
+family = "UbuntuMono Nerd Font Mono"
 style = "Regular"
+[font.bold]
+family = "UbuntuMono Nerd Font Mono"
+style = "Bold"
+[font.italic]
+family = "UbuntuMono Nerd Font Mono"
+style = "Italic"
+[font.bold_italic]
+family = "UbuntuMono Nerd Font Mono"
+style = "Bold Italic"
 
 [cursor]
 style = "Block"
 
+# Colors (Gruvbox dark)
+# Default colors
 [colors.primary]
-background = "#282828"
-foreground = "#EBDBB2"
+# hard contrast background = = '#1d2021'
+# background = "#282828"
+background = '#32302f'
+# soft contrast background = = '#32302f'
+foreground = '#ebdbb2'
 
+# Normal colors
 [colors.normal]
-black   = "#282828"
-red     = "#CC241D"
-green   = "#98971A"
-yellow  = "#D79921"
-blue    = "#458588"
-magenta = "#B16286"
-cyan    = "#689D6A"
-white   = "#A89984"
+black   = '#282828'
+red     = '#cc241d'
+green   = '#98971a'
+yellow  = '#d79921'
+blue    = '#458588'
+magenta = '#b16286'
+cyan    = '#689d6a'
+white   = '#a89984'
 
+# Bright colors
 [colors.bright]
-black   = "#928374"
-red     = "#FB4934"
-green   = "#B8BB26"
-yellow  = "#FABD2F"
-blue    = "#83A598"
-magenta = "#D3869B"
-cyan    = "#8EC07C"
-white   = "#EBDBB2"
+black   = '#928374'
+red     = '#fb4934'
+green   = '#b8bb26'
+yellow  = '#fabd2f'
+blue    = '#83a598'
+magenta = '#d3869b'
+cyan    = '#8ec07c'
+white   = '#ebdbb2'
 
 # Enable Vi Mode Toggle
 [[keyboard.bindings]]
@@ -123,3 +141,19 @@ key = "N"
 mods = "Shift"
 mode = "Vi"
 action = "SearchPrevious"
+
+# URL hints: Ctrl+Shift+U opens a link, Ctrl+Shift+Y copies one to the clipboard
+[[hints.enabled]]
+regex = "(www\\.|ipfs:|ipns:|magnet:|mailto:|gemini://|gopher://|https://|http://|news:|file:|git://|ssh:|ftp://)[^\u0000-\u001F\u007F-\u009F<>\"\\s{-}\\^⟨⟩`\\\\]+"
+hyperlinks = true
+post_processing = true
+command = "/home/rene/.local/bin/public-scripts/open-url"
+mouse.enabled = true
+binding = { key = "U", mods = "Control|Shift" }
+
+[[hints.enabled]]
+regex = "(www\\.|ipfs:|ipns:|magnet:|mailto:|gemini://|gopher://|https://|http://|news:|file:|git://|ssh:|ftp://)[^\u0000-\u001F\u007F-\u009F<>\"\\s{-}\\^⟨⟩`\\\\]+"
+hyperlinks = true
+post_processing = true
+action = "Copy"
+binding = { key = "Y", mods = "Control|Shift" }

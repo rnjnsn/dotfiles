@@ -1,0 +1,5 @@
+[Unit]
+Description=Move PDFs/EPUBs from ~/downloads to ~/docs/lit/misc
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/public-scripts/move_lit.sh

@@ -7,7 +7,7 @@ return {
     require('lualine').setup({
       options = {
         theme = 'gruvbox-material',
-        icons_enabled = false, -- Disable icons
+        icons_enabled = false,
       },
       sections = {
         lualine_c = {

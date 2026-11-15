@@ -1,30 +1,30 @@
-# To get image previews, follow these 4 steps:
-# 1. Install ueberzug
-# 2. Your previewer file (e.g., ~/.config/lf/previewer) must include a ueberzug image preview command.
-# 3. Define a cleaner script as shown below using `set cleaner`.
-# 4. Start lf via a wrapper script (e.g., ~/.local/bin/lfub) to initialize ueberzug environment.
-#    You can alias this in your shellrc: `alias lf="lfub"`
+# ========================================
+# LF CONFIGURATION
+# ========================================
+# Image previews: the previewer draws real sixel images in terminals that
+# support them (foot, also inside tmux) and colored text art otherwise
+# (Alacritty). `set sixel true` lets lf display the sixel output.
 
-# Main options
-set icons
+# ========================================
+# GENERAL SETTINGS
+# ========================================
 set period 1
-#set relativenumber
-#set number
 set hidden!
 set hiddenfiles ".*:*.aux:*.log:*.bbl:*.bcf:*.blg:*.run.xml"
-set cleaner '~/.config/lf/cleaner'
+set sixel true
 set previewer '~/.config/lf/previewer'
-set promptfmt "
- \033[48;2;23;147;209;38;2;255;255;255m \033[38;2;23;147;209;48;2;202;31;31m
-\033[38;2;202;31;31;48;2;40;47;62m
-\033[38;2;255;255;255m %w 
-\033[38;2;40;47;62;48;2;58;67;89m
-\033[38;2;255;255;255m %f 
-\033[38;2;58;67;89;49m\033[m"
 set incsearch
 set incfilter
-#set globsearch on
-set ratios 2:3:4
+set ratios 1:2:3
+
+# zp: toggle a large preview (hides the parent column, preview takes 4/5)
+cmd toggle-big-preview &{{
+    if [ "$lf_ratios" = "1:4" ]; then
+        lf -remote "send $id set ratios 1:2:3"
+    else
+        lf -remote "send $id set ratios 1:4"
+    fi
+}}
 set truncatechar "…"
 set waitmsg "\033[1;31m⏎ to continue...\033[m"
 set timefmt "02/01/2006 15:04:05 "
@@ -42,17 +42,44 @@ set shell "bash"
 set ruler 'df:acc:progress:selection:filter:ind'
 set cursorpreviewfmt "\033[7m"
 
+# Prompt formatting
+set promptfmt "
+ \033[48;2;23;147;209;38;2;255;255;255m \033[38;2;23;147;209;48;2;202;31;31m
+\033[38;2;202;31;31;48;2;40;47;62m
+\033[38;2;255;255;255m %w 
+\033[38;2;40;47;62;48;2;58;67;89m
+\033[38;2;255;255;255m %f 
+\033[38;2;58;67;89;49m\033[m"
+
 source '~/.config/lf/opener'
 
 %test $LF_LEVEL -eq 1 || >&2 printf "Warning: You are inside a nested lf instance!"
 
+# ========================================
+# KEY MAPPINGS - SORTING
+# ========================================
+
+map st :set sortby time; set reverse true
+map sn :set sortby name; set reverse false
+map ss :set sortby size; set reverse true
+map sa :set sortby atime; set reverse true
+map sc :set sortby ctime; set reverse true
+map se :set sortby ext; set reverse false
+map sD :set dirfirst!
+map sr :set reverse!
+
+# ========================================
+# FILE OPERATIONS
+# ========================================
+
+# Basic file operations
 cmd mkdir $mkdir -p "$(echo $* | tr ' ' '\ ')"
 cmd trash %trash-put $fx
 
 cmd delete ${{
 	clear; tput cup $(($(tput lines)/3)); tput bold
 	set -f
-	printf -- "%s\n" $fx | sed 's|'"$HOME"'||'
+	printf -- "%s\n" $fx | sed 's|'"$HOME"'||'
 	printf "\t\033[1;33mDelete? \033[37m[\033[32my\033[37m/\033[31mN\033[37m]\033[m "
 	read -r REPLY
 	case "$REPLY" in
@@ -60,15 +87,10 @@ cmd delete ${{
 	esac
 }}
 
-cmd chmodx &{{
-	chmod u+x $fx
-	lf -remote "send $id reload"
-}}
-
 cmd shred ${{
 	clear; tput cup $(($(tput lines)/3)); tput bold
 	set -f
-	printf -- "%s\n" $fx | sed 's|'"$HOME"'||'
+	printf -- "%s\n" $fx | sed 's|'"$HOME"'||'
 	printf "\t\033[1;34mShred permanently? \033[37m[\033[32my\033[37m/\033[31mN\033[37m]\033[m "
 	read -r REPLY
 	case "$REPLY" in
@@ -84,6 +106,31 @@ cmd shred ${{
 	esac
 }}
 
+cmd chmodx &{{
+	chmod u+x $fx
+	lf -remote "send $id reload"
+}}
+
+# Bulk rename with editor
+cmd bulkrename ${{
+    old="$(mktemp)"
+    new="$(mktemp)"
+    [ -n "$fs" ] && fs="$(basename -a -- $fs)" || fs="$(ls)"
+    printf '%s\n' "$fs" >"$old"
+    printf '%s\n' "$fs" >"$new"
+    $EDITOR "$new"
+    [ "$(wc -l < "$new")" -ne "$(wc -l < "$old")" ] && exit
+    paste "$old" "$new" | while IFS=$'\t' read -r src dst; do
+        [ "$src" = "$dst" ] || [ -e "$dst" ] || mv -- "$src" "$dst"
+    done
+    rm -- "$old" "$new"
+    lf -remote "send $id unselect"
+}}
+
+# ========================================
+# ARCHIVE OPERATIONS
+# ========================================
+
 cmd extract ${{
 	clear; tput cup $(($(tput lines)/3)); tput bold
 	set -f
@@ -94,6 +141,13 @@ cmd extract ${{
 		[yYsS]) aunpack $fx ;;
 	esac
 }}
+
+cmd zip %zip -r "$f.zip" $fx
+cmd tar %tar czf "$f.tar.gz" $fx
+
+# ========================================
+# COPY/MOVE OPERATIONS
+# ========================================
 
 cmd moveto ${{
 	clear; tput cup $(($(tput lines)/3)); tput bold
@@ -126,16 +180,29 @@ cmd copyto ${{
 	notify-send "lf" "Copied to $dest"
 }}
 
-cmd broot ${{
-	selected="$(broot)"
-	if [ -d "$selected" ]; then
-		lf -remote "send ${id} cd \"${selected}\""
-	elif [ -e "$selected" ]; then
-		lf -remote "send ${id} select \"${selected}\""
-	else
-		>&2 printf "Could not select %s\n" "${selected}"
-	fi
+cmd fzf-move ${{
+    dest="$(fd -t d | fzf --header='Move to:')"
+    [ -n "$dest" ] && mv -iv $fx "$dest"
 }}
+
+cmd fzf-copy ${{
+    dest="$(fd -t d | fzf --header='Copy to:')"
+    [ -n "$dest" ] && cp -ivr $fx "$dest"
+}}
+
+# ========================================
+# CLIPBOARD OPERATIONS
+# ========================================
+
+cmd yank-path $printf '%s' "$f" | wl-copy
+cmd yank-basename $basename -a -- $fx | wl-copy
+cmd yank-dirname $dirname -- "$f" | wl-copy
+cmd yank-fullpath $realpath "$f" | wl-copy
+cmd yank-pwd $printf '%s' "$PWD" | wl-copy
+
+# ========================================
+# LINK OPERATIONS
+# ========================================
 
 cmd paste_link %{{
 	IFS='\n'
@@ -156,6 +223,37 @@ cmd paste_link %{{
 
 cmd follow_link %{{
 	lf -remote "send ${id} select \"$(readlink $f)\""
+}}
+
+cmd link ${{
+    set -- $(cat ~/.local/share/lf/files)
+    mode="$1"
+    shift
+    if [ "$#" -lt 1 ]; then
+        lf -remote "send $id echo no files to link"
+        exit 0
+    fi
+    case "$mode" in
+        copy) ln -sr -t . -- "$@";;
+        move) ln -t . -- "$@";;
+    esac
+    rm ~/.local/share/lf/files
+    lf -remote "send clear"
+}}
+
+# ========================================
+# NAVIGATION HELPERS
+# ========================================
+
+cmd broot ${{
+	selected="$(broot)"
+	if [ -d "$selected" ]; then
+		lf -remote "send ${id} cd \"${selected}\""
+	elif [ -e "$selected" ]; then
+		lf -remote "send ${id} select \"${selected}\""
+	else
+		>&2 printf "Could not select %s\n" "${selected}"
+	fi
 }}
 
 cmd zlua %{{
@@ -196,18 +294,76 @@ cmd gsh_i ${{
 	fi
 }}
 
+# ========================================
+# SELECTION HELPERS
+# ========================================
+
+cmd select-pattern ${{
+    printf "Pattern: "
+    read pattern
+    lf -remote "send $id unselect"
+    lf -remote "send $id glob-select $pattern"
+}}
+
+# ========================================
+# GIT INTEGRATION
+# ========================================
+
+cmd git_status ${{
+    clear
+    git -C "$(dirname "$f")" status 2>/dev/null || git status
+    read -p "Press enter to continue"
+}}
+
+cmd git_log ${{
+    clear
+    git -C "$(dirname "$f")" log --oneline --graph --decorate --all | less
+}}
+
+# ========================================
+# IMAGE OPERATIONS
+# ========================================
+
+cmd img-resize ${{
+    printf "Width: "; read width
+    for f in $fx; do
+        magick "$f" -resize "${width}x" "${f%.*}_${width}.${f##*.}"
+    done
+    lf -remote "send $id reload"
+}}
+
+cmd img-optimize ${{
+    for f in $fx; do
+        optipng "$f" 2>/dev/null || jpegoptim "$f" 2>/dev/null
+    done
+}}
+
+cmd setbg "$1"
+
+# ========================================
+# UTILITY COMMANDS
+# ========================================
+
+cmd dirsize $du -sh $fx | less
+
 cmd stop ${{
 	kill -TSTP $(ps -p $$ -o 'ppid=')
 }}
 
-cmd setbg "$1"
+cmd edit-config ${{
+    $EDITOR ~/.config/lf/lfrc
+    lf -remote "send $id source ~/.config/lf/lfrc"
+}}
+
+# ========================================
+# CUSTOM SCRIPTS
+# ========================================
 
 cmd remove_dupes ${{
     ~/.local/bin/public-scripts/remove-dupes.sh "$PWD"
 }}
 
 cmd prefix_files ${{
-    # Pass selected files to the script
     [ -n "$fs" ] && printf '%s\n' $fs | ~/.local/bin/public-scripts/prefix-files.sh || echo "No files selected."
 }}
 
@@ -216,65 +372,72 @@ cmd rsyncpull ${{
     lf -remote "send $id echo '✅ Downloaded with rsync'"
 }}
 
-map <a-p> rsyncpull
+cmd rsync-to-mint ${{
+    set -f
+    rsync -avz --progress -- $fx rene@192.168.194.213:~/Videos/
+    lf -remote "send $id echo '✅ Transferred to mint Videos'"
+}}
 
+# ========================================
+# DRAG AND DROP
+# ========================================
 
-map <a-d> rsyncpull
+cmd drag_all &ls -Ah --zero | xargs -d'\0' dragon-drag-and-drop 2>/dev/null
+cmd drag_allx &ls -Ah --zero | xargs -d'\0' dragon-drag-and-drop -a -x 2>/dev/null
 
+# ========================================
+# KEY MAPPINGS - MOVEMENT
+# ========================================
 
-map rd remove-dupes
-map pf prefix-files
-
-# KEY MAPPINGS
-# (Only relevant comments shown; all functional keybinds preserved.)
-
-# Movement
 map k up
 map j down
 map h updir
 map l open
 map Ñ openwith
-# map h read
 map { half-up
 map } half-down
 map <c-n> down
 map <c-p> up
 
-# File name search
-# Dependency: my 'ffd' script which uses:
-# - fd or find, fzf, tput; bat and lsd (for previews)
+map e
+
+# ========================================
+# KEY MAPPINGS - FILE SEARCH
+# ========================================
+
 map f
-map ff $lf -remote "send $id select \"$(ffd -p)\"" # → Fuzzy select a file (with preview), highlight in lf
-map fe &ffd -f -e -p # fe → Fuzzy open a file (zathura, glow, feh, nvim, etc.)
-map fd $lf -remote "send $id cd \"$(ffd -d -p)\"" # fd → Fuzzy cd into a directory
-map fb broot # fb → Launch broot (tree view with live fuzzy filter)
-map -  search
-map _  search-back
+map ff $lf -remote "send $id select \"$(ffd -p)\""
+map fe &ffd -f -e -p
+map fd $lf -remote "send $id cd \"$(ffd -d -p)\""
+map fb broot
+map - search
+map _ search-back
 map zf find
 map zF find-back
+map zp toggle-big-preview
 
+# ========================================
+# KEY MAPPINGS - CONTENT SEARCH
+# ========================================
 
-# File content search
-# Dependency: my 'rgfzf' script which uses:
-# - bash, rg or rga (which has other optional deps), fzf; bat (for previews)
 map rg $lf -remote "send $id select \"$(rgfzf -p)\""
 map rG $lf -remote "send $id select \"$(rgfzf -p --depth 1)\""
 map rf $lf -remote "send $id select \"$(rgfzf -dp)\""
 map rF $lf -remote "send $id select \"$(rgfzf -dp --depth 1)\""
 map ra $lf -remote "send $id select \"$(rgfzf -dp --rg=rga --depth 1 -s 0.3)\""
-map rA $lf -remote "send $id select \"$(rgfzf -dp --rg=rga -s 0.8)\""  # Can be very CPU intensive, use with care
+map rA $lf -remote "send $id select \"$(rgfzf -dp --rg=rga -s 0.8)\""
 
-# Main maps
-map Km maps  # List normal mode mappings
-map Kc cmaps  # List command mode mappings
+# ========================================
+# KEY MAPPINGS - FILE OPERATIONS
+# ========================================
+
+map Km maps
+map Kc cmaps
 map d
 map dd cut
 map D delete
-# map <a-d> trash
 map <a-D> shred
 map E extract
-#map C copyto
-#map M moveto
 map P paste_link
 map <a-n> push :mkdir<space>
 map <a-t> push $touch<space>
@@ -284,17 +447,96 @@ map x $$f
 map X !$f
 map <a-x> chmodx
 map <a-X> $setbg $f
-map C &compila $f  # Compile
-map <a-c> $compila -ir $f  # Interpret/Compile and run
+map C &compila $f
+map <a-c> $compila -ir $f
 map o &mimeopen $f
 map O $mimeopen --ask $f
 map U glob-unselect *
 map <a-u> glob-select *
-# Remember that 'v' toggles selections
-# TODO:
-# - recursive selection
+map v toggle
 
-# Navigation
+# Archive operations
+map az zip
+map at tar
+
+# Bulk operations
+map B bulkrename
+map rd remove_dupes
+map pf prefix_files
+map <a-p> rsyncpull
+map <a-d> rsyncpull
+map tx rsync-to-mint
+
+# Move/Copy
+map <a-m> fzf-move
+map <a-C> fzf-copy
+map L link
+
+# Selection
+map sp select-pattern
+map . set hidden!
+
+# Size info
+map S dirsize
+
+# ========================================
+# KEY MAPPINGS - CLIPBOARD
+# ========================================
+
+map Y $printf "%s" "$fx" | wl-copy
+map yp yank-path
+map yn yank-basename
+map yd yank-dirname
+map yf yank-fullpath
+map yw yank-pwd
+
+# ========================================
+# KEY MAPPINGS - NAVIGATION SHORTCUTS
+# ========================================
+
+
+# System directories
+map gr cd /
+map gt cd /tmp
+map gs $lf -remote "send $id cd \"$SCRIPTS\""
+
+# Personal directories
+# (Maps that a shorter map shadowed — gdl, gdd, gre, gsc, gwc… — were removed;
+#  use the shell alias names with ' below instead.)
+map gc cd ~/.config
+map gp cd ~/projects
+map gd cd ~/downloads
+map gl cd ~/docs/lit
+map gn cd ~/notes
+
+# Shell aliases in lf: ' + alias name + Enter, e.g. 'dl ⏎ or 'cv ⏎.
+# Reads ~/.aliases.bash, so the names are always the same as in the shell.
+# "cd" aliases go to the folder (or select the file), editor aliases open the file.
+cmd goto ${{
+    def=$(bash -c 'shopt -s expand_aliases; source ~/.aliases.bash >/dev/null 2>&1; alias -- "$1"' _ "$1" 2>/dev/null) || true
+    if [ -z "$def" ]; then
+        lf -remote "send $id echoerr No alias named '$1' in ~/.aliases.bash"
+        exit 0
+    fi
+    eval "set -- ${def#*=}"   # alias prints name='value'; unquote the value
+    eval "set -- $1"          # split it into words, expanding ~ and $VARS
+    command=$1; shift
+    case "$command" in
+        cd)
+            if [ -d "$1" ]; then
+                lf -remote "send $id cd \"$1\""
+            else
+                lf -remote "send $id select \"$1\""
+            fi ;;
+        nvim|vim|vi|"${EDITOR:-nvim}")
+            "${EDITOR:-nvim}" "$@" ;;
+        *)
+            lf -remote "send $id echoerr Alias '$command…' is not a folder or file alias" ;;
+    esac
+}}
+map "'" push :goto<space>
+
+# Navigation tools
 map z<space> push :zlua<space>
 map <a-z> zlua_i
 map <a-g> gsh_i
@@ -302,30 +544,86 @@ map zo zlua_i
 map g<space> push :gsh<space>
 map gñ push :gsh_fuzzy<space>
 map go gsh_i
-map gl follow_link
-map gr cd /
-map gt cd /tmp
-map gs $lf -remote "send $id cd \"$SCRIPTS\""
+map gL follow_link
 map J jumps
-# navigate the jump list with "#[", "#]"
 
-# Drag commands
-# Dependencies: dragon-drag-and-drop and my 'drag' script which uses it
+# ========================================
+# KEY MAPPINGS - FILE EDITING
+# ========================================
 
-cmd drag_all &ls -Ah --zero | xargs -d'\0' dragon-drag-and-drop 2>/dev/null
-cmd drag_allx &ls -Ah --zero | xargs -d'\0' dragon-drag-and-drop -a -x 2>/dev/null
+map V push $"$EDITOR"<space>
 
-map dl drag_all  # Drag from files in current dir
-map dL drag_allx    # Drag all files in current dir and exit
-map ds &dragon-drag-and-drop $fx  # Drag from selected files
-map dS &dragon-drag-and-drop -a -x $fx  # Drag all selected files and exit
-map dm &drag mv "$PWD"  # Drag move into current dir
-map dc &drag cp "$PWD"  # Drag copy into current dir
-map dw &drag wget "$PWD"  # Drag download into current dir
+# Hyprland
+map eh $"$EDITOR" ~/.config/hypr/hyprland.conf
 
-#map J $lf -remote "send $id cd $(sed -e 's/\s*#.*//' -e '/^$/d' -e 's/^\S*\s*//' "${XDG_CONFIG_HOME:-"$HOME/.config"}/shell/bm-dirs" | fzf)"
+# Website CSS files
+map ewba $"$EDITOR" ~/projects/rnjnsn-website/static/base.css
+map ewab $"$EDITOR" ~/projects/rnjnsn-website/static/css/style-about.css
+map ewco $"$EDITOR" ~/projects/rnjnsn-website/static/css/style-contact.css
+map ewre $"$EDITOR" ~/projects/rnjnsn-website/static/css/style-resources.css
+map ewpo $"$EDITOR" ~/projects/rnjnsn-website/static/css/style-post.css
 
-# Command mode
+# Website content files
+map ecab $"$EDITOR" ~/projects/rnjnsn-website/content/about/_index.html
+map ecco $"$EDITOR" ~/projects/rnjnsn-website/content/contact/_index.html
+map ecre $"$EDITOR" ~/projects/rnjnsn-website/content/resources/_index.html
+
+# Career files
+map eapp $"$EDITOR" ~/docs/career/resumebuilder/app.md
+map ecv $"$EDITOR" ~/docs/career/resumebuilder/cv.md
+
+# ========================================
+# KEY MAPPINGS - GIT
+# ========================================
+
+map <a-g>s git_status
+map <a-g>l git_log
+
+# ========================================
+# KEY MAPPINGS - IMAGE OPERATIONS
+# ========================================
+
+map <a-i>r img-resize
+map <a-i>o img-optimize
+map cb &fondo-awesome $f
+
+# ========================================
+# KEY MAPPINGS - DRAG AND DROP
+# ========================================
+
+map dl drag_all
+map dL drag_allx
+map ds &dragon-drag-and-drop $fx
+map dS &dragon-drag-and-drop -a -x $fx
+map dm &drag mv "$PWD"
+map dc &drag cp "$PWD"
+map dw &drag wget "$PWD"
+
+# ========================================
+# KEY MAPPINGS - SYSTEM
+# ========================================
+
+map <c-z> stop
+map <c-r> edit-config
+map W &{ nohup "${TERMINAL:-alacritty}" >/dev/null 2>&1& }
+map wf &{ nohup "${TERMINAL:-alacritty}" --working-directory "$(dirname "$f")" >/dev/null 2>&1 & }
+
+# ========================================
+# KEY MAPPINGS - RENAMING
+# ========================================
+
+map c
+map r
+map i rename
+map A push i<a-A>
+map cc push i<a-A><c-u>
+map I push i<c-a>
+map a push i<a-A><a-b>
+
+# ========================================
+# COMMAND MODE MAPPINGS
+# ========================================
+
 cmap <tab> cmd-menu-complete
 cmap <backtab> cmd-menu-complete-back
 cmap <a-j> cmd-left
@@ -334,31 +632,3 @@ cmap <a-h> cmd-escape
 cmap <a-I> cmd-home
 cmap <a-A> cmd-end
 cmap <a-,> cmd-delete
-#cmap <a-backspace> cmd-delete  # Bug: No se puede mapear alt + backspace al parecer
-
-# Renaming
-map c
-map r
-map i rename  # Before extension
-map A push i<a-A>  # At the very end
-map cc push i<a-A><c-u>  # New rename
-map I push i<c-a>  # At the very beginning
-map a push i<a-A><a-b>  # After extension
-# map b $vidir   # Bulkrename in $EDITOR, 'vidir' from more-utils
-# map B $find | vidir -
-
-map V push $"$EDITOR"<space>
-
-map <c-z> stop
-
-# New forked terminal in current directory
-map W &{ nohup "${TERMINAL:-alacritty}" >/dev/null 2>&1& }
-
-# Copy selected file names
-map Y $printf "%s" "$fx" | xclip -selection clipboard
-
-# Change background image
-map cb &fondo-awesome $f
-
-# Source Bookmarks
-#source "~/.config/lf/shortcutrc"

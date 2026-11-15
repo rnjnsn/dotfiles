@@ -1,0 +1,10 @@
+# Secrets and private config
+.ssh/
+.gnupg/
+.config/git/credentials
+.config/waybar/secret.env
+.env
+.local/share/keyrings/
+
+# macOS junk
+.DS_Store

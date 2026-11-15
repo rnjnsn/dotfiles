@@ -35,9 +35,10 @@ window#waybar {
   padding: 0 6px;
 }
 
-/* Right-side modules */
 #clock,
 #cpu,
+#custom-vpn,
+#custom-disk,
 #memory,
 #battery {
   color: #bbbbbb;
@@ -49,3 +50,10 @@ window#waybar {
   padding-right: 10px; /* tweak this to match workspace left margin */
 }
 
+
+/* --- dwm-style focused workspace, added by setup_dwm_style_and_master_stack.sh --- */
+#workspaces button.focused {
+    background: #005577;
+    color: #eeeeee;
+    border: 1px solid #005577;
+}

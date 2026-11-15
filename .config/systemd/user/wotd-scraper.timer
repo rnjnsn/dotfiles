@@ -1,0 +1,9 @@
+[Unit]
+Description=Run WOTD scraper daily at 12:00 Berlin time
+
+[Timer]
+OnCalendar=*-*-* 12:00:00 Europe/Berlin
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,40 +1,67 @@
 #!/bin/bash
-
 # Source the bookmarks file
-source "$HOME/.local/bin/public-scripts/bookmarks"  # Adjust path as needed
-
+source "$HOME/.local/bin/public-scripts/bookmarks"
+# Set your Obsidian vault path
+VAULT_PATH="$HOME/notes"
 # Get programs from PATH
 programs=$(compgen -c | sort -u)
-
 # Get bookmarks from the sourced file
 bookmarks=$(get_all_bookmarks)
-
-# Combine programs and bookmarks
-all_options="$programs"$'\n'"$bookmarks"
-
+# Get Obsidian notes with "Note:" prefix
+notes=$(fd --type f --extension md . "$VAULT_PATH" \
+    | sed "s|$VAULT_PATH/||" \
+    | sed 's/^/Note: /')
+# Get files inside ~/docs with "Doc:" prefix
+docs=$(fd --type f . "$HOME/docs" \
+    | sed "s|$HOME/docs/||" \
+    | sed 's/^/Doc: /')
+# Combine all options
+all_options="$programs"$'\n'"$bookmarks"$'\n'"$notes"$'\n'"$docs"
 # Show fuzzel menu and get selection
 selected=$(echo "$all_options" | fuzzel --dmenu -p "Run/Open:")
-
 # Exit if nothing was selected
 if [ -z "$selected" ]; then
     exit 0
 fi
-
-# Check if selection is a bookmark (starts with category prefix)
-if [[ "$selected" == AI:* || "$selected" == News:* || "$selected" == Social:* ]]; then
-    # Get URL using the function from bookmarks file
+if [[ "$selected" == Note:* ]]; then
+    note_path="${selected#Note: }"
+    case "$note_path" in
+        *.pdf|*.epub)
+            setsid zathura "$VAULT_PATH/$note_path" >/dev/null 2>&1 &
+            ;;
+        *)
+            encoded=$(echo "$note_path" | sed 's/ /%20/g')
+            xdg-open "obsidian://open?vault=notes&file=$encoded" &
+            ;;
+    esac
+elif [[ "$selected" == Doc:* ]]; then
+    file_path="$HOME/docs/${selected#Doc: }"
+    case "$file_path" in
+        *.pdf|*.epub)
+            setsid zathura "$file_path" >/dev/null 2>&1 &
+            ;;
+        *)
+            xdg-open "$file_path" &
+            ;;
+    esac
+elif [[ "$selected" == AI:* || "$selected" == Docs:* || "$selected" == News:* || "$selected" == Social:* ]]; then
     url=$(get_bookmark_url "$selected")
-    
-    # Check if Firefox is running
     if pgrep -x firefox > /dev/null; then
-        # Firefox is running, open URL in a new tab
         firefox --new-tab "$url" &
     else
-        # Firefox is not running, start a new instance
         firefox "$url" &
     fi
+elif [[ "$selected" == td\ * ]]; then
+    task="${selected#td }"
+    TODO_FILE="$HOME/docs/todo.txt"
+    if grep -qxF "$task" "$TODO_FILE" 2>/dev/null; then
+        grep -vxF "$task" "$TODO_FILE" > /tmp/todo_tmp && mv /tmp/todo_tmp "$TODO_FILE"
+        notify-send "✓ Removed" "$task"
+    else
+        echo "$task" >> "$TODO_FILE"
+        notify-send "✓ Added" "$task"
+    fi
+    pkill -RTMIN+9 waybar 2>/dev/null || true
 else
-    # It's a command, execute it
-    setsid "$selected" >/dev/null 2>&1 &
+    setsid bash -c "$selected" >/dev/null 2>&1 &
 fi
-

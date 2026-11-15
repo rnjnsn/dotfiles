@@ -1,0 +1,66 @@
+[global]
+    follow = mouse
+
+### Geometry ###
+width = 300
+height = 100
+origin = top-right
+offset = 10x10
+gap_size = 6
+
+### Style ###
+transparency = 0
+corner_radius = 0
+frame_width = 2
+
+### Font ###
+font = monospace 10
+
+### Padding ###
+padding = 10
+horizontal_padding = 10
+
+### Icons ###
+icon_position = off
+min_icon_size = 0
+max_icon_size = 32
+
+### Text ###
+markup = full
+format = "<b>%s</b>\n%b"
+
+### Behavior ###
+sort = yes
+stack_duplicates = true
+indicate_hidden = yes
+shrink = no
+
+### Colors ###
+foreground = "#bbbbbb"
+background = "#222222"
+frame_color = "#005577"
+
+### Separator ###
+separator_height = 2
+separator_color = frame
+
+### Timeout ###
+timeout = 5
+
+[urgency_low]
+background = "#222222"
+foreground = "#bbbbbb"
+frame_color = "#444444"
+timeout = 3
+
+[urgency_normal]
+background = "#222222"
+foreground = "#bbbbbb"
+frame_color = "#005577"
+timeout = 5
+
+[urgency_critical]
+background = "#222222"
+foreground = "#eeeeee"
+frame_color = "#ff0000"
+timeout = 0

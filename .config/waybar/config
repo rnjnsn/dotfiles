@@ -1,12 +1,10 @@
 {
   "layer": "top",
   "position": "top",
-
-  "modules-left": ["hyprland/workspaces"],
-  "modules-center": ["hyprland/window"],
-  "modules-right": ["cpu", "custom/disk", "memory", "battery", "custom/nordvpn", "clock"],
-
-  "hyprland/window": {
+  "modules-left": ["sway/workspaces"],
+  "modules-center": ["sway/window"],
+  "modules-right": ["custom/pomodoro", "cpu", "custom/disk", "memory", "battery", "custom/vpn", "clock"],
+  "sway/window": {
     "format": "{}",
     "max-length": 50
   },
@@ -15,7 +13,6 @@
     "format": "CPU {usage}%",
     "interval": 2
   },
-
   "custom/disk": {
     "exec": "~/.local/bin/public-scripts/disk_usage",
     "interval": 30,
@@ -23,12 +20,10 @@
     "tooltip": true,
     "return-type": "json"
   },
-
   "memory": {
     "format": "MEM {used:0.1f}G",
     "interval": 2
   },
-
   "battery": {
     "format": "BAT {capacity}%",
     "format-charging": "BAT {capacity}% (C)",
@@ -37,15 +32,13 @@
     "format-critical": "BAT {capacity}%",
     "interval": 30
   },
-
-  "custom/nordvpn": {
-    "exec": "~/.local/bin/public-scripts/nordvpn_status",
+  "custom/vpn": {
+    "exec": "~/.local/bin/public-scripts/vpn_status",
     "interval": 10,
     "format": "{}",
     "tooltip": true,
     "return-type": "json"
   },
-
   "clock": {
     "format": "{:%H:%M  %a %d %b}",
     "interval": 1
