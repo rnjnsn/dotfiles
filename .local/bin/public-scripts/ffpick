@@ -1,0 +1,18 @@
+#!/bin/sh
+# dmenu-style picker over Firefox bookmarks + most-visited history (fuzzel). Opens the pick in Firefox.
+# Reads a copy of places.sqlite, so it works while Firefox is running.
+prof=$(find ~/.mozilla/firefox -maxdepth 1 -name '*.default-release' | head -n1)
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+cp "$prof/places.sqlite" "$tmp/p.sqlite" 2>/dev/null || exit 1
+[ -f "$prof/places.sqlite-wal" ] && cp "$prof/places.sqlite-wal" "$tmp/p.sqlite-wal"
+pick=$(sqlite3 -separator '  ' "$tmp/p.sqlite" "
+  SELECT '★ ' || COALESCE(b.title, p.title, ''), p.url
+    FROM moz_bookmarks b JOIN moz_places p ON p.id = b.fk WHERE b.type = 1
+  UNION ALL
+  SELECT * FROM (SELECT COALESCE(p.title, ''), p.url FROM moz_places p
+    WHERE p.url LIKE 'http%' AND p.hidden = 0 ORDER BY p.frecency DESC LIMIT 3000);" \
+  | awk -F'  ' '!seen[$2]++' \
+  | fuzzel --dmenu --width 120 --lines 20 -p "web: ") || exit 0
+url=${pick##*  }
+case $url in http*) ;; *) url="https://duckduckgo.com/?q=$pick" ;; esac   # free text = search
+exec firefox "$url"

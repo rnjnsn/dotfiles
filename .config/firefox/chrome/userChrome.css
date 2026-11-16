@@ -1,0 +1,109 @@
+/* Gruvbox dark (soft) for the Firefox interface, matching Alacritty/foot.
+   bg0_h #1d2021  bg0 #282828  bg0_s #32302f  bg1 #3c3836  bg2 #504945
+   bg3 #665c54    fg #ebdbb2   fg4 #a89984    yellow #fabd2f  orange #fe8019 */
+
+:root {
+  /* tab strip / window frame */
+  --toolbox-bgcolor: #282828 !important;
+  --toolbox-bgcolor-inactive: #282828 !important;
+  --toolbox-textcolor: #ebdbb2 !important;
+  --toolbox-textcolor-inactive: #a89984 !important;
+  --lwt-accent-color: #282828 !important;
+  --lwt-accent-color-inactive: #282828 !important;
+  --lwt-text-color: #ebdbb2 !important;
+
+  /* tabs */
+  --tab-selected-bgcolor: #32302f !important;
+  --tab-selected-textcolor: #ebdbb2 !important;
+  --lwt-selected-tab-background-color: #32302f !important;
+  --tab-hover-background-color: #3c3836 !important;
+  --tab-loading-fill: #fabd2f !important;
+  --tab-line-color: #fabd2f !important;
+
+  /* nav bar, bookmarks bar, sidebar */
+  --toolbar-bgcolor: #32302f !important;
+  --toolbar-color: #ebdbb2 !important;
+  --toolbar-field-background-color: #3c3836 !important;
+  --toolbar-field-color: #ebdbb2 !important;
+  --toolbar-field-focus-background-color: #282828 !important;
+  --toolbar-field-focus-color: #ebdbb2 !important;
+  --toolbar-field-border-color: transparent !important;
+  --toolbar-field-focus-border-color: #fabd2f !important;
+  --toolbarbutton-hover-background: #504945 !important;
+  --toolbarbutton-active-background: #665c54 !important;
+  --urlbar-box-bgcolor: #3c3836 !important;
+  --urlbar-box-hover-bgcolor: #504945 !important;
+  --urlbar-box-active-bgcolor: #665c54 !important;
+  --urlbar-box-text-color: #ebdbb2 !important;
+  --urlbarView-highlight-background: #504945 !important;
+  --urlbarView-highlight-color: #ebdbb2 !important;
+  --urlbarView-hover-background: #3c3836 !important;
+  --sidebar-background-color: #32302f !important;
+  --sidebar-text-color: #ebdbb2 !important;
+  --chrome-content-separator-color: #1d2021 !important;
+
+  /* menus and popups */
+  --arrowpanel-background: #282828 !important;
+  --arrowpanel-color: #ebdbb2 !important;
+  --arrowpanel-border-color: #504945 !important;
+  --panel-separator-color: #504945 !important;
+  --button-hover-bgcolor: #3c3836 !important;
+  --button-active-bgcolor: #504945 !important;
+  --menu-background-color: #282828 !important;
+  --menu-color: #ebdbb2 !important;
+  --menuitem-hover-background-color: #3c3836 !important;
+  --menu-border-color: #504945 !important;
+
+  /* accents and focus rings */
+  --focus-outline-color: #fabd2f !important;
+  --color-accent-primary: #fabd2f !important;
+  --color-accent-primary-hover: #fe8019 !important;
+  --color-accent-primary-active: #d65d0e !important;
+  --button-text-color-primary: #282828 !important;
+  --toolbarbutton-icon-fill-attention: #fabd2f !important;
+}
+
+/* things that don't read the variables everywhere */
+#navigator-toolbox { background-color: #282828 !important; border-bottom-color: #1d2021 !important; }
+#nav-bar, #PersonalToolbar { background-color: #32302f !important; color: #ebdbb2 !important; }
+.tab-background[selected] { background-color: #504945 !important; background-image: none !important; }
+#urlbar-background { background-color: #3c3836 !important; border-color: transparent !important; }
+#urlbar[focused] > #urlbar-background { background-color: #282828 !important; }
+menupopup, panel { --panel-background: #282828 !important; --panel-color: #ebdbb2 !important; --panel-border-color: #504945 !important; }
+#tabbrowser-tabpanels, #tabbrowser-tabbox { background-color: #32302f !important; } /* blank flash while loading */
+
+/* ---- Firefox 160 color names (the ones above are the older names) ---- */
+:root, #sidebar-main, sidebar-main, #sidebar-box, #vertical-tabs, .tabbrowser-tab {
+  --toolbox-background-color: #282828 !important;
+  --toolbox-background-color-inactive: #282828 !important;
+  --toolbox-text-color: #ebdbb2 !important;
+  --toolbox-text-color-inactive: #a89984 !important;
+  --toolbar-background-color: #32302f !important;
+  --toolbar-text-color: #ebdbb2 !important;
+  --toolbar-field-background-color: #3c3836 !important;
+  --toolbar-field-background-color-focus: #282828 !important;
+  --toolbar-field-text-color: #ebdbb2 !important;
+  --toolbar-field-text-color-focus: #ebdbb2 !important;
+  --toolbar-field-border-color-focus: #fabd2f !important;
+  --toolbarbutton-background-color-hover: #504945 !important;
+  --toolbarbutton-background-color-active: #665c54 !important;
+  --sidebar-background-color: #32302f !important;
+  --sidebar-text-color: #ebdbb2 !important;
+  --sidebar-border-color: #504945 !important;
+  --sidebar-box-background: #3c3836 !important;
+  --tabpanel-background-color: #32302f !important;
+  --tab-background-color-selected: #504945 !important;
+  --tab-background-color-hover: #3c3836 !important;
+  --tab-text-color: #ebdbb2 !important;
+  --tab-text-color-hover: #ebdbb2 !important;
+  --tab-text-color-selected: #ebdbb2 !important;
+  --panel-background-color: #282828 !important;
+  --panel-text-color: #ebdbb2 !important;
+  --popup-background-color: #282828 !important;
+  --popup-border-color: #504945 !important;
+  --background-color-box: #282828 !important;
+  --background-color-canvas: #32302f !important;
+}
+
+/* the vertical-tabs sidebar sits directly on #browser */
+#browser, #sidebar-main, #sidebar-box, #sidebar { background-color: #32302f !important; color: #ebdbb2 !important; }

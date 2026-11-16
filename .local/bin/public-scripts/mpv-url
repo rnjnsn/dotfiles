@@ -1,0 +1,10 @@
+#!/bin/sh
+# Play a URL (argument, else clipboard) in mpv via yt-dlp.
+# Firefox flow: Vimium C `yy` (this page) or `yf` (hint a link), then Super+y.
+url=${1:-$(wl-paste --no-newline 2>/dev/null)}
+case $url in
+  http://*|https://*) ;;
+  *) notify-send -u low "mpv-url" "Clipboard is not a URL"; exit 1 ;;
+esac
+notify-send -u low "mpv" "$url"
+exec mpv --force-window=immediate --ytdl-format='bv*[height<=1440]+ba/b' -- "$url"

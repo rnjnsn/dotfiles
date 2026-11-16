@@ -1,0 +1,60 @@
+{
+ "name": "Vimium C",
+ "vimSync": true,
+ "keyLayout": 2,
+ "scrollStepSize": 200,
+ "keyMappings": [
+  "# ---- vertical tabs: J = tab below, K = tab above",
+  "map J nextTab",
+  "map K previousTab",
+  "map <a-j> moveTabRight",
+  "map <a-k> moveTabLeft",
+  "map gp togglePinTab",
+  "map gm toggleMuteTab",
+  "map gr toggleReaderMode",
+  "# ---- copy for Obsidian: ym = this tab as a md link, yM = all tabs in window as a md list",
+  "map ym copyWindowInfo type=\"tab\" format=\"[${title}](${url})\"",
+  "map yM copyWindowInfo format=\"- [${title}](${url})\" join",
+  "# ---- \",\" leader: jump to the tab if open, else open it (like a run-or-raise)",
+  "map ,c focusOrLaunch url=\"https://claude.ai/\" prefix",
+  "map ,m focusOrLaunch url=\"https://mail.google.com/\" prefix",
+  "map ,d focusOrLaunch url=\"https://docs.google.com/\" prefix",
+  "map ,g focusOrLaunch url=\"https://github.com/\" prefix",
+  "map ,y focusOrLaunch url=\"https://www.youtube.com/\" prefix",
+  "map ,l focusOrLaunch url=\"https://www.linkedin.com/\" prefix",
+  "map ,s focusOrLaunch url=\"https://www.chess.com/\" prefix",
+  "map ,a focusOrLaunch url=\"https://portal.azure.com/\" prefix"
+ ],
+ "searchEngines": [
+  "d|ddg: https://duckduckgo.com/?q=%s DuckDuckGo",
+  "g: https://www.google.com/search?q=%s Google",
+  "y|yt: https://www.youtube.com/results?search_query=%s YouTube",
+  "gh: https://github.com/search?q=%s&type=repositories GitHub",
+  "aw: https://wiki.archlinux.org/index.php?search=%s ArchWiki",
+  "ap: https://archlinux.org/packages/?q=%s Arch packages",
+  "aur: https://aur.archlinux.org/packages?K=%s AUR",
+  "w: https://en.wikipedia.org/w/index.php?search=%s Wikipedia",
+  "wda: https://da.wikipedia.org/w/index.php?search=%s Wikipedia DA",
+  "wde: https://de.wikipedia.org/w/index.php?search=%s Wikipedia DE",
+  "ddo: https://ordnet.dk/ddo/ordbog?query=%s Den Danske Ordbog",
+  "dw: https://www.dwds.de/wb/%s DWDS",
+  "c: https://claude.ai/new?q=%s Claude",
+  "gpt: https://chatgpt.com/?q=%s ChatGPT",
+  "mdn: https://developer.mozilla.org/en-US/search?q=%s MDN",
+  "py: https://docs.python.org/3/search.html?q=%s Python docs",
+  "ms: https://learn.microsoft.com/en-us/search/?terms=%s MS Learn",
+  "a|amz: https://www.amazon.de/s?k=%s Amazon.de",
+  "m|osm: https://www.openstreetmap.org/search?query=%s OpenStreetMap"
+ ],
+ "searchUrl": "https://duckduckgo.com/?q=$s DuckDuckGo",
+ "exclusionRules": [
+  {
+   "pattern": "^https?://docs\\.google\\.com/",
+   "passKeys": ""
+  },
+  {
+   "pattern": "^https?://mail\\.google\\.com/",
+   "passKeys": "j k o u e x c r a f s # / ? [ ]"
+  }
+ ]
+}
