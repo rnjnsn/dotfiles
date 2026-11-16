@@ -1,0 +1,15 @@
+* {
+    font-family: 'UbuntuMono Nerd Font Mono', monospace;
+    font-size: 12px;
+}
+
+window#waybar {
+    background-color: rgba(20, 20, 20, 0.85);
+    color: #cdd6f4;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#custom-wotd {
+    padding: 0 16px;
+    color: #cdd6f4;
+}
