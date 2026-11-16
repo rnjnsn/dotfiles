@@ -19,7 +19,7 @@ input "type:touchpad" {
     pointer_accel 0
 }
 input "type:keyboard" {
-    xkb_layout us,dk
+    xkb_layout us,dk,de
 }
 output eDP-1 resolution 1920x1200@60Hz scale 1 position 2560,0
 output DP-1 resolution 3840x2160@60Hz scale 1.5 position 0,0
@@ -44,18 +44,20 @@ workspace 9 output DP-1 eDP-1
 # Start on workspace 1 (lands on DP-1 if connected, otherwise the laptop)
 workspace number 1
 exec waybar
+exec waybar -c ~/.config/waybar/config-bottom.json -s ~/.config/waybar/style-bottom.css
 exec obsidian --ozone-platform=wayland --enable-features=UseOzonePlatform
 exec sleep 1 && systemctl --user restart pipewire pipewire-pulse wireplumber
 set $terminal foot
 set $browser firefox
+set $anki ~/.pyenv/shims/anki
 set $notes_app obsidian --ozone-platform=wayland --enable-features=UseOzonePlatform
 set $mail ~/.local/bin/public-scripts/protonmail-wayland.sh
 set $calendar ~/.local/bin/public-scripts/calendar-wayland.sh
 set $menu ~/.local/bin/public-scripts/fuzzel-run-path
-for_window [app_id="^(firefox)$"] move to workspace number 2
-for_window [app_id="^(Alacritty)$"] move to workspace number 1
-for_window [app_id="^(foot)$"] move to workspace number 1
-for_window [app_id="^md.obsidian.Obsidian$"] move to workspace number 3
+assign [app_id="^firefox$"] workspace number 2
+assign [app_id="^Alacritty$"] workspace number 1
+assign [app_id="^foot$"] workspace number 1
+assign [app_id="^md\.obsidian\.Obsidian$"] workspace number 3
 for_window [app_id="^(chrome-calendar\.proton\.me__-Default)$"] floating disable
 for_window [title="^(Proton Mail.*)$"] floating disable
 for_window [app_id="^(chrome-.*)$"] floating disable
@@ -86,6 +88,7 @@ bindsym $mainMod+t exec i3a-swap
 bindsym $mainMod+Control+h move container to output left, focus output left
 bindsym $mainMod+Control+l move container to output right, focus output right
 bindsym $mainMod+space floating toggle
+bindsym $mainMod+Shift+space input type:keyboard xkb_switch_layout next
 bindsym $mainMod+f fullscreen toggle
 bindsym $mainMod+1 workspace number 1
 bindsym $mainMod+2 workspace number 2
@@ -109,9 +112,9 @@ bindsym $mainMod+comma focus output left
 bindsym $mainMod+period focus output right
 bindsym $mainMod+Control+Shift+h move workspace to output left
 bindsym $mainMod+Control+Shift+l move workspace to output right
-bindsym XF86AudioRaiseVolume exec pactl set-sink-volume @DEFAULT_SINK@ +5%
-bindsym XF86AudioLowerVolume exec pactl set-sink-volume @DEFAULT_SINK@ -5%
-bindsym XF86AudioMute exec pactl set-sink-mute @DEFAULT_SINK@ toggle
+bindsym XF86AudioRaiseVolume exec wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+
+bindsym XF86AudioLowerVolume exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
+bindsym XF86AudioMute exec wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
 bindsym XF86MonBrightnessUp exec brightnessctl set 5%+
 bindsym XF86MonBrightnessDown exec brightnessctl set 5%-
 bindsym $mainMod+Shift+x exit
@@ -128,7 +131,7 @@ bindsym $mainMod+equal [app_id="^(imv|dwds)$"] opacity plus 0.1
 # dwds popup: floating, centered
 for_window [app_id="^dwds$"] floating enable, resize set 900 750, move position center, opacity 0.85
 exec ~/.config/swaybg/launch.sh
-bindsym $mainMod+Shift+f exec i3a-swap
+bindsym $mainMod+Shift+f exec $anki
 exec /home/rene/.local/bin/i3a-master-stack --stack=dwm --stack-size=35
 bindsym $mainMod+Shift+z exec swaylock
 bindsym Mod4+Shift+t exec ~/.local/bin/private-scripts/claude-translate
@@ -146,3 +149,11 @@ for_window [app_id=".*"] inhibit_idle fullscreen
 exec wlsunset -S 07:00 -s 20:00 -t 4000
 # Auto-mount USB drives with a notification
 exec udiskie --automount --notify
+
+# --- Firefox glue (2026-11-16) ---
+# Super+y: play the copied URL in mpv (Vimium C: yy = this page, yf = hint a link)
+bindsym $mainMod+y exec ~/.local/bin/public-scripts/mpv-url
+# Super+o: fuzzel over Firefox bookmarks + history; free text = DuckDuckGo search
+bindsym $mainMod+o exec ~/.local/bin/public-scripts/ffpick
+# Picture-in-Picture: small, floating, sticky, bottom-right
+for_window [app_id="firefox" title="^Picture-in-Picture$"] floating enable, sticky enable, resize set 640 360, move position 100 ppt 100 ppt, move left 660 px, move up 380 px
