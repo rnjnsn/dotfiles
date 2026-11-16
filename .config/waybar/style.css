@@ -1,5 +1,5 @@
 * {
-  font-family: 'Ubuntu Nerd Font Mono', monospace;
+  font-family: 'UbuntuMono Nerd Font Mono', monospace;
   font-size: 12px;
   font-weight: bold;
 }
@@ -37,12 +37,57 @@ window#waybar {
 
 #clock,
 #cpu,
-#custom-vpn,
 #custom-disk,
 #memory,
-#battery {
+#battery,
+#custom-pomodoro,
+#idle_inhibitor,
+#network,
+#wireplumber,
+#backlight,
+#language,
+#tray {
   color: #bbbbbb;
   margin-left: 40px;
+}
+
+/* Pomodoro: highlight while running */
+#custom-pomodoro.work {
+  color: #eeeeee;
+  background: #005577;
+  padding: 0 6px;
+}
+
+#custom-pomodoro.done {
+  color: #222222;
+  background: #88aa66;
+  padding: 0 6px;
+}
+
+/* Keep-awake on: make it obvious so it's not left on by accident */
+#idle_inhibitor.activated {
+  color: #222222;
+  background: #ddaa33;
+  padding: 0 6px;
+}
+
+#network.disconnected,
+#network.linked,
+#wireplumber.muted {
+  color: #ff6666;
+}
+
+/* Battery warnings (only when not charging) */
+#battery.warning:not(.charging):not(.plugged) {
+  color: #222222;
+  background: #ddaa33;
+  padding: 0 6px;
+}
+
+#battery.critical:not(.charging):not(.plugged) {
+  color: #ffffff;
+  background: #ff0000;
+  padding: 0 6px;
 }
 
 /* Extra spacing at far right (matches workspace spacing) */

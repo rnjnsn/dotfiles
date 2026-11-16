@@ -157,3 +157,6 @@ bindsym $mainMod+y exec ~/.local/bin/public-scripts/mpv-url
 bindsym $mainMod+o exec ~/.local/bin/public-scripts/ffpick
 # Picture-in-Picture: small, floating, sticky, bottom-right
 for_window [app_id="firefox" title="^Picture-in-Picture$"] floating enable, sticky enable, resize set 640 360, move position 100 ppt 100 ppt, move left 660 px, move up 380 px
+
+# pavucontrol (waybar volume click): float it at a usable size instead of tiling
+for_window [app_id="^org\.pulseaudio\.pavucontrol$"] floating enable, resize set 900 600, move position center

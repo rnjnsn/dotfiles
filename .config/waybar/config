@@ -3,12 +3,34 @@
   "position": "top",
   "modules-left": ["sway/workspaces"],
   "modules-center": ["sway/window"],
-  "modules-right": ["custom/pomodoro", "cpu", "custom/disk", "memory", "battery", "custom/vpn", "clock"],
+  "modules-right": [
+    "custom/pomodoro", "idle_inhibitor", "cpu", "custom/disk", "memory",
+    "network", "wireplumber", "backlight", "battery",
+    "sway/language", "tray", "clock"
+  ],
   "sway/window": {
     "format": "{}",
     "max-length": 50
   },
 
+  "custom/pomodoro": {
+    "exec": "~/.config/waybar/scripts/pomodoro.sh",
+    "interval": 1,
+    "format": "{}",
+    "tooltip": true,
+    "return-type": "json",
+    "on-click": "~/.config/waybar/scripts/pomodoro.sh toggle",
+    "signal": 10
+  },
+  "idle_inhibitor": {
+    "format": "{icon}",
+    "format-icons": {
+      "activated": "AWAKE ON",
+      "deactivated": "AWAKE OFF"
+    },
+    "tooltip-format-activated": "Screen lock/blank disabled (click to re-enable)",
+    "tooltip-format-deactivated": "Click to keep the screen awake"
+  },
   "cpu": {
     "format": "CPU {usage}%",
     "interval": 2
@@ -24,20 +46,53 @@
     "format": "MEM {used:0.1f}G",
     "interval": 2
   },
+  "network": {
+    "format-wifi": "NET {essid} {signalStrength}%",
+    "format-ethernet": "NET eth",
+    "format-linked": "NET no IP",
+    "format-disconnected": "NET down",
+    "tooltip-format-wifi": "{ifname}: {ipaddr}/{cidr}\n{essid} ({signalStrength}%, {frequency} GHz)\n↓ {bandwidthDownBytes}  ↑ {bandwidthUpBytes}",
+    "tooltip-format-ethernet": "{ifname}: {ipaddr}/{cidr}\n↓ {bandwidthDownBytes}  ↑ {bandwidthUpBytes}",
+    "on-click": "foot -e nmtui",
+    "interval": 5
+  },
+  "wireplumber": {
+    "format": "VOL {volume}%",
+    "format-muted": "VOL muted",
+    "on-click": "pkill -x pavucontrol || pavucontrol",
+    "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "scroll-step": 5,
+    "max-volume": 100
+  },
+  "backlight": {
+    "device": "intel_backlight",
+    "format": "BRI {percent}%",
+    "on-scroll-up": "brightnessctl set 5%+",
+    "on-scroll-down": "brightnessctl set 5%-"
+  },
   "battery": {
+    "states": {
+      "warning": 20,
+      "critical": 10
+    },
     "format": "BAT {capacity}%",
     "format-charging": "BAT {capacity}% (C)",
-    "format-plugged": "BAT {capacity}% (C)",
+    "format-plugged": "BAT {capacity}% (AC)",
+    "format-not-charging": "BAT {capacity}% (AC, held at 80%)",
+    "format-full": "BAT {capacity}% (full)",
     "format-warning": "BAT {capacity}%",
     "format-critical": "BAT {capacity}%",
+    "tooltip-format": "{timeTo}, {power:0.1f} W",
     "interval": 30
   },
-  "custom/vpn": {
-    "exec": "~/.local/bin/public-scripts/vpn_status",
-    "interval": 10,
-    "format": "{}",
-    "tooltip": true,
-    "return-type": "json"
+  "sway/language": {
+    "format": "<span font_family='Noto Color Emoji'>{flag}</span>",
+    "tooltip-format": "{long}",
+    "on-click": "swaymsg input type:keyboard xkb_switch_layout next"
+  },
+  "tray": {
+    "icon-size": 14,
+    "spacing": 8
   },
   "clock": {
     "format": "{:%H:%M  %a %d %b}",
