@@ -1,0 +1,283 @@
+#!/bin/bash
+# claude-concept — deep, critical analysis of an idea, saved as a Zettelkasten note.
+# Self-contained: the prompt is at the bottom of this file. Edit it there.
+#
+# Unlike claude-chapter and claude-phil-extract, this opens an interactive session:
+# a short phrase is often ambiguous, so Claude can ask which idea you mean first,
+# and you can ask follow-ups. Exit Claude (/exit or Ctrl+D) to open the note in nvim.
+#
+# Usage:
+#   claude-concept                            # asks for the idea
+#   claude-concept the cognitive revolution   # same, in one line
+set -euo pipefail
+
+ZET_DIR="$HOME/notes/00_inbox"
+TOOLS=(Read Write Glob WebSearch WebFetch "Bash(ls:*)" "Bash(pdfinfo:*)" "Bash(pdftotext:*)")
+
+die() { echo "Error: $*" >&2; exit 1; }
+
+command -v claude >/dev/null || die "claude CLI not found"
+[ -d "$ZET_DIR" ] || die "Zettelkasten directory not found at $ZET_DIR"
+
+# --- Inputs -----------------------------------------------------------------
+
+idea="$*"
+[ -n "$idea" ] || read -r -p "Idea: " idea
+[ -n "$idea" ] || die "No idea given"
+
+# --- Build the prompt -------------------------------------------------------
+
+prompt=$(sed -n '/^: <<'"'"'PROMPT'"'"'$/,/^PROMPT$/{//!p}' "$0")
+prompt="${prompt//@INBOX@/$ZET_DIR}"
+prompt="${prompt//@TIMESTAMP@/$(date '+%Y-%m-%d %H:%M:%S')}"
+TAGS_FILE="$HOME/notes/90_system/tags.md"
+[ -f "$TAGS_FILE" ] || { echo "Error: tag list not found at $TAGS_FILE" >&2; exit 1; }
+allowed_tags=$(awk '/^### Approved/{f=1;next} /^### Aliases/{f=0} f && /^- /{sub(/^- /,""); gsub(/, */,"\n"); print}' "$TAGS_FILE" | paste -sd, | sed 's/,/, /g')
+[ -n "$allowed_tags" ] || { echo "Error: no tags found in $TAGS_FILE" >&2; exit 1; }
+prompt="${prompt//@TAGS@/$allowed_tags}"
+prompt="${prompt//@IDEA@/$idea}"
+
+# --- Run --------------------------------------------------------------------
+
+marker=$(mktemp)
+trap 'rm -f "$marker"' EXIT
+
+echo "Opening Claude for \"$idea\". Exit Claude when the note is written to open it in nvim."
+
+claude "$prompt" \
+    ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"} \
+    --add-dir "$ZET_DIR" \
+    --allowedTools "${TOOLS[@]}"
+
+# --- Open the new note ------------------------------------------------------
+
+note=$(find "$ZET_DIR" -maxdepth 1 -name '*.md' -newer "$marker" -print 2>/dev/null \
+       | xargs -r ls -t 2>/dev/null | head -1)
+[ -n "$note" ] || die "no new note found in $ZET_DIR"
+
+# --- Keep the note name unique across the vault (governance §4) -------------
+# Links resolve by file name, so a clash with any note elsewhere in ~/notes
+# breaks them. Rename the new note to <name>-2, -3, … until it is unique.
+VAULT="$HOME/notes"
+base=$(basename "$note" .md); name="$base"; n=2
+while find "$VAULT" -path "$VAULT/.git" -prune -o -iname "$name.md" ! -samefile "$note" -print -quit | grep -q .; do
+    name="$base-$n"; n=$((n + 1))
+done
+if [ "$name" != "$base" ]; then
+    new="$(dirname "$note")/$name.md"
+    mv -n "$note" "$new"
+    echo "Renamed to $name.md: a note named $base.md already exists in the vault."
+    note="$new"
+fi
+
+echo "$note" > /tmp/last_zettel
+
+if [ -z "${NVIM:-}" ]; then
+    nvim "$note"
+else
+    echo "(Not opening inside Neovim)"
+fi
+
+exit 0
+
+# --- Prompt (read by the script above; @PLACEHOLDERS@ are filled in at run time) ---
+
+: <<'PROMPT'
+# Deep Analysis of an Idea
+
+## Context
+
+- Idea: @IDEA@
+- Inbox directory: @INBOX@
+- Timestamp: @TIMESTAMP@
+
+I want to develop a deep, precise, and critical understanding of the following idea:
+
+**@IDEA@**
+
+If the idea is ambiguous (for example, the name refers to two different ideas), ask me which one I mean before starting. Otherwise, start right away.
+
+Explain it in a way that enables me to understand not only what it is, but why it exists, how it works, what makes it significant, and how to evaluate it independently.
+
+Structure your analysis around the following questions, adapting them to the nature of the idea rather than mechanically applying every question.
+
+**1. Meaning and essence**
+- What is the idea, stated as clearly and precisely as possible?
+- What is its central insight?
+- What is the simplest way to understand it intuitively?
+- What does it mean, and what does it not mean?
+- Which distinctions are essential to understanding it correctly?
+
+**2. The problem and motivation**
+- What question, problem, observation, need, or dissatisfaction gives rise to the idea?
+- Why does this problem matter?
+- What would remain unexplained, unresolved, or misunderstood without the idea?
+- What makes the idea worth considering?
+
+**3. Origins and context**
+- Where does the idea come from, and under what circumstances did it emerge?
+- What intellectual, historical, scientific, social, or practical context helps explain its development?
+- Which earlier ideas influenced it, and what did it change, challenge, or build upon?
+- Distinguish the origin of the idea from the origin of the problem it addresses.
+
+**4. Internal structure and mechanism**
+- How does the idea work, conceptually, logically, causally, or practically?
+- What are its constituent parts, underlying assumptions, and essential relationships?
+- Reconstruct its reasoning step by step, where applicable.
+- What makes its conclusion follow from its premises, or its proposed mechanism produce its claimed result?
+- Identify hidden assumptions, ambiguities, and potential gaps in reasoning.
+
+**5. Examples and applications**
+- Provide concrete examples that make the idea understandable.
+- Show how it applies in practice, where relevant.
+- Include a case where it works well and a case where its application becomes questionable or fails.
+- Explain what the examples demonstrate and what they do not establish.
+
+**6. Connections and intellectual landscape**
+- How does the idea relate to other important ideas, theories, disciplines, or traditions?
+- What does it share with them, and what distinguishes it?
+- Which related concepts are necessary for understanding it?
+- Does it depend on, contradict, extend, or challenge other ideas?
+- Map the most important relationships without creating superficial connections.
+
+**7. Evidence, justification, and explanatory power**
+- What reasons, evidence, arguments, observations, or experiences support the idea?
+- What kind of justification is appropriate for its subject matter?
+- What does it explain, illuminate, predict, or enable us to do?
+- Which claims are well established, which are plausible, and which remain speculative or contested?
+- What evidence or reasoning would weaken the idea?
+
+**8. Criticism and alternatives**
+- What are the strongest objections to the idea?
+- What are the best alternative explanations, theories, or approaches?
+- Where are the genuine disagreements, and what assumptions drive them?
+- How might a knowledgeable defender respond to the strongest criticism?
+- After considering both sides, which arguments are most convincing, and why?
+
+**9. Development and present significance**
+- How has the idea evolved, been interpreted, or been challenged over time?
+- What is its current standing in the relevant fields or communities?
+- What is its significance today, and what practical or theoretical consequences follow from it?
+- What remains unresolved, and what developments could change our understanding of it?
+
+**10. Boundaries, implications, and consequences**
+- What follows if the idea is correct?
+- What does it not establish, and where does its explanatory power end?
+- What further assumptions are needed to move from the idea to stronger conclusions?
+- What are its broader implications, including unintended consequences where relevant?
+- Under what conditions would accepting or applying it be justified?
+
+**11. Overall assessment**
+- What are the idea's greatest strengths and weaknesses?
+- How important is it relative to competing ideas?
+- What is the strongest defensible version of the idea?
+- What should a reasonable person believe about it, and with what degree of confidence?
+- Which questions are most important for reaching a more definitive judgment?
+
+**12. Conceptual synthesis**
+Conclude by providing:
+- A concise explanation of the idea in plain language.
+- Its central insight in one sentence.
+- A map of its problem, assumptions, mechanism, justification, implications, and limitations.
+- The most important distinctions needed to avoid misunderstanding it.
+- One or two powerful examples that capture its essence.
+- The most important unresolved question.
+- A short list of the most valuable next topics to explore for deeper understanding.
+
+## Instructions for the analysis
+
+Begin with the simplest useful explanation and progressively develop greater precision and depth. Make the reasoning explicit rather than merely listing facts. Use examples to clarify abstract claims, not to substitute for arguments.
+
+Adapt the analysis to the type of idea. A scientific theory requires attention to empirical evidence and prediction; a philosophical argument requires logical reconstruction and conceptual distinctions; a mathematical idea requires definitions, derivations, and proofs where appropriate; a political or moral idea requires attention to values, institutions, consequences, and competing principles. Do not force every framework onto every subject.
+
+Distinguish description from evaluation, historical influence from truth, correlation from causation, and a claim's plausibility from its evidential support. Represent opposing positions fairly without assuming they are equally strong.
+
+Use reliable sources when factual, historical, or scholarly claims warrant them (use web search to check current standing and recent developments). Cite substantive claims, identify significant disagreements, and be transparent about uncertainty. Do not invent consensus or manufacture controversy. Never invent citations: cite only sources you are confident exist, giving author, title and year, and a URL only if you actually retrieved it.
+
+Prioritize explanatory depth, conceptual precision, and intellectual coherence over length, exhaustive coverage, or impressive terminology. Avoid repetition and superficial name-dropping.
+
+The ultimate goal is to build a connected mental model that allows me to explain the idea in my own words, recognize it in unfamiliar contexts, evaluate its strengths and weaknesses, and understand what follows from accepting or rejecting it.
+
+---
+
+## Output: save as a Zettelkasten note
+
+Do NOT print the analysis in chat. Instead:
+
+1. **Title:** the idea in Title Case.
+2. **Filename:** the title lowercased, everything except letters, digits and spaces removed, spaces replaced with `-`, plus `.md`, in the inbox directory above. If the inbox directory doesn't exist, stop and report the error. If the file already exists, append `-2`, `-3`, … instead of overwriting.
+3. **Properties and tags:** keep `type`, `status` and `origin` exactly as in the structure below. Add 1–3 tags chosen **only** from this list (the approved and under-review tags in `~/notes/90_system/tags.md`): @TAGS@. Never invent a tag, and never use `resources`, `zettelkasten`, provenance or format tags. If no listed tag fits, use none (`tags: []`) and say so in your chat reply, suggesting the tag you would have wanted. Start the body on the line directly after the closing `---`, with no blank line in between.
+4. **Write the file** with exactly this structure:
+
+```markdown
+---
+title: "<Title>"
+created: <Timestamp from above>
+type: note
+status: developing
+origin: claude
+tags:
+  - <topic-tag>
+  - <topic-tag>
+---
+## <Title>
+
+### 1. Meaning and essence
+...
+
+### 2. The problem and motivation
+...
+
+### 3. Origins and context
+...
+
+### 4. Internal structure and mechanism
+...
+
+### 5. Examples and applications
+...
+
+### 6. Connections and intellectual landscape
+...
+
+### 7. Evidence, justification, and explanatory power
+...
+
+### 8. Criticism and alternatives
+...
+
+### 9. Development and present significance
+...
+
+### 10. Boundaries, implications, and consequences
+...
+
+### 11. Overall assessment
+...
+
+### 12. Conceptual synthesis (plain-language explanation, one-sentence insight, map, key distinctions, essential examples, most important unresolved question, next topics to explore)
+...
+
+## Connections
+
+
+## Sources
+
+**Consulted** (opened during this session):
+- <Author>, *<Title>* (<Year>). <URL>
+
+**From general knowledge** (not checked in this session):
+- <Author>, *<Title>* (<Year>)
+
+
+## Questions
+
+
+```
+
+Notes on the structure:
+- `## Connections` and `## Questions` are for me to fill in. Leave them empty: just the heading, nothing below it.
+- All citations go under `## Sources`; inline, refer to them briefly (e.g. "Clark & Chalmers 1998"). Split them into two groups: **Consulted** lists only sources you actually opened in this session (via web search or fetch), with the URL; **From general knowledge** lists everything else. Never put a source under Consulted that you did not open. If one group is empty, leave it out.
+
+5. **Reply in chat** with only: the path of the note and a two-sentence summary of the idea.
+PROMPT

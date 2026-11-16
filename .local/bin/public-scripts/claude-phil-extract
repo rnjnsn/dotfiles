@@ -1,0 +1,520 @@
+#!/bin/bash
+# claude-phil-extract — philosophical reading of a technical paper from a PDF, saved as a Zettelkasten note.
+# Self-contained: the prompt is at the bottom of this file. Edit it there.
+#
+# Usage:
+#   claude-phil-extract               # asks for the PDF
+#   claude-phil-extract paper.pdf     # same, in one line
+set -euo pipefail
+
+ZET_DIR="$HOME/notes/00_inbox"
+TOOLS=(Read Write Glob WebSearch WebFetch "Bash(ls:*)" "Bash(pdfinfo:*)" "Bash(pdftotext:*)")
+
+die() { echo "Error: $*" >&2; exit 1; }
+
+command -v claude >/dev/null || die "claude CLI not found"
+[ -d "$ZET_DIR" ] || die "Zettelkasten directory not found at $ZET_DIR"
+
+# --- Inputs -----------------------------------------------------------------
+
+pdf="${1:-}"
+[ -n "$pdf" ] || read -e -r -p "PDF: " pdf
+pdf="${pdf/#\~/$HOME}"
+[ -f "$pdf" ] || die "PDF not found: $pdf"
+pdf_dir="$(cd "$(dirname "$pdf")" && pwd)"
+pdf_abs="$pdf_dir/$(basename "$pdf")"
+
+# --- Build the prompt -------------------------------------------------------
+
+prompt=$(sed -n '/^: <<'"'"'PROMPT'"'"'$/,/^PROMPT$/{//!p}' "$0")
+prompt="${prompt//@INBOX@/$ZET_DIR}"
+prompt="${prompt//@TIMESTAMP@/$(date '+%Y-%m-%d %H:%M:%S')}"
+TAGS_FILE="$HOME/notes/90_system/tags.md"
+[ -f "$TAGS_FILE" ] || { echo "Error: tag list not found at $TAGS_FILE" >&2; exit 1; }
+allowed_tags=$(awk '/^### Approved/{f=1;next} /^### Aliases/{f=0} f && /^- /{sub(/^- /,""); gsub(/, */,"\n"); print}' "$TAGS_FILE" | paste -sd, | sed 's/,/, /g')
+[ -n "$allowed_tags" ] || { echo "Error: no tags found in $TAGS_FILE" >&2; exit 1; }
+prompt="${prompt//@TAGS@/$allowed_tags}"
+prompt="${prompt//@PDF@/$pdf_abs}"
+
+# --- Run --------------------------------------------------------------------
+
+marker=$(mktemp)
+trap 'rm -f "$marker"' EXIT
+
+echo "Analyzing $(basename "$pdf") — this can take several minutes…"
+
+printf '%s' "$prompt" | claude -p \
+    ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"} \
+    --add-dir "$ZET_DIR" "$pdf_dir" \
+    --allowedTools "${TOOLS[@]}"
+
+# --- Open the new note ------------------------------------------------------
+
+note=$(find "$ZET_DIR" -maxdepth 1 -name '*.md' -newer "$marker" -print 2>/dev/null \
+       | xargs -r ls -t 2>/dev/null | head -1)
+[ -n "$note" ] || die "no new note found in $ZET_DIR"
+
+# --- Keep the note name unique across the vault (governance §4) -------------
+# Links resolve by file name, so a clash with any note elsewhere in ~/notes
+# breaks them. Rename the new note to <name>-2, -3, … until it is unique.
+VAULT="$HOME/notes"
+base=$(basename "$note" .md); name="$base"; n=2
+while find "$VAULT" -path "$VAULT/.git" -prune -o -iname "$name.md" ! -samefile "$note" -print -quit | grep -q .; do
+    name="$base-$n"; n=$((n + 1))
+done
+if [ "$name" != "$base" ]; then
+    new="$(dirname "$note")/$name.md"
+    mv -n "$note" "$new"
+    echo "Renamed to $name.md: a note named $base.md already exists in the vault."
+    note="$new"
+fi
+
+echo "$note" > /tmp/last_zettel
+
+if [ -z "${NVIM:-}" ]; then
+    nvim "$note"
+else
+    echo "(Not opening inside Neovim)"
+fi
+
+exit 0
+
+# --- Prompt (read by the script above; @PLACEHOLDERS@ are filled in at run time) ---
+
+: <<'PROMPT'
+# Philosophical Analysis of a Technical Paper
+
+## Context
+
+- PDF: @PDF@
+- Inbox directory: @INBOX@
+- Timestamp: @TIMESTAMP@
+
+## Step 1: Read the whole paper
+
+Read every page, including definitions, equations, experimental design, evaluation criteria and appendices. Run `pdfinfo` for the page count; for PDFs over 20 pages, read in page ranges until done (or extract the text with `pdftotext`). Do not stop at the abstract and discussion. Note page or section numbers so claims can be cited.
+
+## Step 2: Analyze
+
+Follow the framework below exactly: all 12 sections, the labels ([Explicit] / [Implicit] / [Implication] / [Speculative]) and the analytical principles, ending with the ranked findings table. Never invent quotations or citations.
+
+# Master Prompt: Philosophical Extraction and Conceptual Analysis of Technical Literature
+
+## Role and objective
+
+You are a philosopher specializing in conceptual analysis, philosophy of science, epistemology, metaphysics, and interdisciplinary philosophical research, with the ability to understand and critically interpret technical and scientific literature.
+
+Your task is to read the technical paper I provide **as a philosopher rather than merely as a technical specialist**.
+
+I am not primarily interested in a conventional summary of its methods, mathematical derivations, experimental procedures, or engineering achievements. I want to identify, reconstruct, and critically examine its **philosophically significant content**: its conceptual claims, assumptions, distinctions, theoretical commitments, explanatory frameworks, arguments, and implications.
+
+Preserve technical precision while translating technically expressed ideas into philosophically intelligible language. Explain technical details when they are necessary to understand a philosophical point.
+
+**Crucially, do not restrict your analysis to the paper's explicit conceptual statements. Pay special attention to conceptual decisions hidden inside technical definitions, models, formalizations, measurement procedures, and evaluation criteria. Ask what conception of the phenomenon these choices presuppose, what alternative conceptions they exclude, and whether the technical success of the approach provides any reason to accept the underlying conception.**
+
+Your goal is not to impose philosophical significance on the paper, but to discover and evaluate the philosophical significance genuinely present in, presupposed by, or reasonably suggested by its technical and theoretical content.
+
+## 1. Technical orientation
+
+Begin with a concise account of the paper's technical contribution.
+
+Identify:
+- The central problem the paper addresses.
+- The phenomenon or system under investigation.
+- The main theoretical or methodological approach.
+- The principal findings or conclusions.
+- The technical concepts necessary to understand the subsequent philosophical analysis.
+
+Keep this section concise and focused on establishing the context for philosophical examination.
+
+## 2. Central conceptual claims
+
+Identify the paper's most philosophically significant conceptual claims.
+
+Look especially for claims concerning:
+
+- What a phenomenon, entity, process, or capacity is.
+- What constitutes or realizes a particular property or ability.
+- What is possible, impossible, necessary, or sufficient.
+- How different concepts, entities, or processes relate to one another.
+- What explains a phenomenon and what constitutes an adequate explanation.
+- What distinguishes one kind of phenomenon or system from another.
+- How a phenomenon should be understood, represented, or investigated.
+
+For each claim:
+
+1. State it clearly in philosophically intelligible language.
+2. Explain the relevant technical context.
+3. Identify the textual evidence supporting the interpretation.
+4. Distinguish the authors' explicit commitments from your philosophical reconstruction.
+5. Explain why the claim is philosophically significant.
+
+Do not merely reproduce the authors' statements. Reconstruct their conceptual content while preserving their intended meaning.
+
+## 3. Hidden conceptual commitments in technical choices
+
+This section is especially important.
+
+Examine how the paper's technical apparatus embodies, presupposes, or privileges particular understandings of the phenomena being investigated.
+
+Analyze the following where relevant:
+
+**A. Definitions and operationalizations**
+
+- How are the central phenomena defined?
+- What conception of the phenomena do these definitions presuppose?
+- Are the definitions merely operational, or do they carry broader conceptual or ontological commitments?
+- What aspects of the phenomena are included, excluded, or abstracted away?
+- What alternative conceptualizations are possible?
+
+**B. Models and representations**
+
+- What features of reality does the model represent?
+- What assumptions about the nature or structure of the phenomenon are built into the representation?
+- What is treated as fundamental, derivative, irrelevant, or reducible?
+- Does the model privilege a particular philosophical understanding of the phenomenon?
+- Could competing philosophical conceptions be equally compatible with the model's success?
+
+**C. Formalizations and mathematical frameworks**
+
+- How are concepts translated into formal structures?
+- What conceptual decisions are involved in this translation?
+- Which distinctions are preserved, collapsed, or excluded?
+- Does the formalism impose assumptions about identity, causality, agency, rationality, information, representation, or other philosophically important categories?
+- What philosophical conclusions, if any, are warranted by the formal results?
+
+**D. Measurement and experimental procedures**
+
+- What is treated as evidence that the phenomenon is present?
+- How do the chosen measurements operationalize the underlying concept?
+- What assumptions connect measurable indicators to the phenomenon itself?
+- Could the same measurements be interpreted differently under alternative philosophical frameworks?
+- Does the procedure risk conflating an indicator of a phenomenon with the phenomenon itself?
+
+**E. Evaluation criteria and standards of success**
+
+- What counts as successful performance, explanation, understanding, prediction, or reproduction?
+- What conception of the target phenomenon is embedded in these criteria?
+- Could a system satisfy the criteria without possessing the property or capacity supposedly being evaluated?
+- Are alternative criteria possible, and would they support different conclusions?
+- Does technical success provide evidence for the conceptual assumptions underlying the evaluation, or merely demonstrate the usefulness of a particular operationalization?
+
+For each philosophically significant technical choice, distinguish:
+
+1. **Technical choice:** What the authors actually define, model, measure, or evaluate.
+2. **Underlying conception:** What understanding of the phenomenon this choice presupposes or privileges.
+3. **Excluded alternatives:** What other conceptions are overlooked, excluded, or rendered difficult to express.
+4. **Philosophical significance:** Why this choice matters for a philosophical question or debate.
+5. **Evidential status:** Whether the technical findings support the underlying conception or merely remain compatible with it.
+
+Avoid assuming that every technical simplification constitutes a substantive philosophical commitment. Distinguish pragmatic methodological choices from genuine conceptual commitments.
+
+## 4. Philosophically significant assumptions
+
+Identify assumptions on which the paper's approach, arguments, or interpretations depend, including assumptions that the authors do not explicitly defend.
+
+Consider:
+
+- **Ontological assumptions:** What kinds of entities, properties, structures, or processes are assumed to exist?
+- **Epistemological assumptions:** What counts as knowledge, evidence, understanding, or justification?
+- **Methodological assumptions:** What counts as a legitimate model, explanation, representation, or investigative method?
+- **Semantic assumptions:** How are central concepts defined, interpreted, or related?
+- **Normative assumptions:** What counts as success, rationality, optimality, improvement, or desirable behavior?
+
+For each assumption, explain:
+
+1. What the assumption is.
+2. Where and how it enters the analysis.
+3. Whether the paper explicitly endorses it or merely relies on it.
+4. Whether the main findings depend on it.
+5. How rejecting or modifying it would affect the paper's conclusions.
+
+Do not attribute a philosophical assumption to the authors without adequate argumentative or textual support.
+
+## 5. Important conceptual distinctions
+
+Extract philosophically significant distinctions explicitly introduced by the paper or reasonably reconstructed from its framework.
+
+Look for distinctions between:
+
+- Different kinds of phenomena, capacities, properties, or processes.
+- A phenomenon and its operational indicators.
+- A theoretical construct and its implementation.
+- A model's predictive or practical success and its explanatory or ontological adequacy.
+- Functional equivalence and underlying mechanistic equivalence.
+- Necessary conditions, sufficient conditions, and contingent correlates.
+
+For each distinction:
+
+1. Define its two or more sides.
+2. Explain how the distinction arises from the technical material.
+3. Identify whether it is explicit or reconstructed.
+4. Show which philosophical problem it clarifies.
+5. Explain its potential significance beyond the paper's immediate technical context.
+
+## 6. Philosophically interesting arguments
+
+Reconstruct arguments in the paper that have philosophical or conceptual significance.
+
+For each argument:
+
+- Identify the premises.
+- State the conclusion.
+- Explain how the conclusion follows from the premises.
+- Identify any technical results on which the argument depends.
+- Make implicit bridging assumptions explicit.
+- Evaluate whether the evidence warrants the conclusion.
+
+Where useful, reconstruct arguments in premise–conclusion form.
+
+Pay particular attention to transitions from technical results to broader conceptual claims.
+
+Ask whether the authors have established a claim about the phenomenon itself, a particular model of the phenomenon, or merely a method of reproducing selected observable features of it.
+
+## 7. Philosophical implications
+
+Investigate what philosophically follows, or might follow, if the paper's results and theoretical claims are correct.
+
+Consider connections to relevant areas such as:
+
+- Metaphysics and ontology.
+- Epistemology.
+- Philosophy of science.
+- Philosophy of mind and cognition.
+- Philosophy of language.
+- Philosophy of technology.
+- Ethics and political philosophy.
+- Logic, rationality, and explanation.
+
+For each implication:
+
+1. State the philosophical proposition or consequence.
+2. Explain which part of the paper motivates it.
+3. Reconstruct the reasoning connecting the technical material to the philosophical conclusion.
+4. Identify any additional philosophical premises required.
+5. Assess the strength of the connection.
+
+Distinguish implications genuinely supported by the research from more speculative philosophical extensions.
+
+Do not force connections to philosophical areas that are not relevant.
+
+## 8. Conceptual tensions, ambiguities, and unresolved problems
+
+Identify philosophically important difficulties in the paper.
+
+Look for:
+
+- Ambiguous or shifting uses of central concepts.
+- Tensions between stated theoretical commitments and actual technical practices.
+- Gaps between operational definitions and broader interpretations.
+- Cases in which empirical success is taken to establish a stronger conceptual conclusion than it warrants.
+- Underdetermination of philosophical interpretations by technical evidence.
+- Unexplored alternative conceptual frameworks.
+- Unresolved questions about what the results actually demonstrate.
+
+For each difficulty:
+
+1. Describe the issue accurately.
+2. Explain why it is philosophical rather than merely technical.
+3. Identify the relevant textual or technical basis.
+4. Discuss possible interpretations or responses.
+5. Explain what would be needed to resolve it.
+
+Be charitable to the authors. Do not manufacture contradictions or attribute claims that their analysis does not support.
+
+## 9. Connections to established philosophical debates
+
+Identify philosophical discussions to which the paper could make a substantive contribution.
+
+For each relevant connection:
+
+- Name the philosophical problem or debate.
+- Briefly explain the central positions or disagreement.
+- Identify the precise conceptual connection with the paper.
+- Explain whether the paper supports, challenges, complicates, or reframes a position.
+- Clarify what the technical findings contribute that purely philosophical argumentation might not.
+
+Mention relevant philosophers, traditions, or theories where appropriate.
+
+Distinguish genuine argumentative relevance from superficial similarities in terminology.
+
+Do not fabricate references or imply that the paper's authors engage with philosophical discussions they do not actually address.
+
+## 10. Philosophical research opportunities
+
+Develop 3–7 substantive philosophical research questions emerging from the paper.
+
+Prioritize questions that could support an original philosophical argument, article, or research project.
+
+For each question:
+
+1. Formulate the question precisely.
+2. Explain how it arises from the paper.
+3. Identify the underlying philosophical problem.
+4. Explain why the paper's technical findings do not settle the issue.
+5. Indicate what philosophical work would be necessary to investigate it.
+6. Suggest a promising argumentative or conceptual direction.
+
+Favor questions that expose overlooked conceptual alternatives, challenge hidden assumptions, clarify the meaning of technical success, or connect technical discoveries to broader philosophical problems.
+
+Avoid merely converting empirical research questions into interrogative sentences.
+
+## 11. Overall philosophical significance
+
+Conclude with a critical evaluation of the paper's philosophical importance.
+
+Address:
+
+- What is the single most significant philosophical idea contained in or suggested by the paper?
+- Which hidden conceptual decision is philosophically most consequential?
+- Does the paper offer a new conceptual framework, challenge an established assumption, or provide evidence relevant to an existing philosophical disagreement?
+- Are its findings compatible with several competing philosophical interpretations?
+- Which philosophical conclusions are well supported, and which require additional argument?
+- What would a philosopher gain from reading this paper that would not be evident from a conventional technical summary?
+
+Assess the paper's significance without exaggeration.
+
+## 12. Ranked philosophical findings
+
+End with a table presenting the five most philosophically significant findings.
+
+Include these columns:
+
+| Philosophical finding | Source in the paper | Status | Why it matters | Research potential |
+|---|---|---|---|---|
+| Clearly formulated claim, assumption, distinction, or problem | Page or section | Explicit / Implicit / Implication / Speculative | Philosophical significance | High / Medium / Low |
+
+Rank the findings according to their combination of conceptual importance, strength of textual support, and potential for further philosophical investigation.
+
+## General analytical principles
+
+Throughout the entire analysis, observe the following principles.
+
+**1. Distinguish levels of interpretation.**
+
+Clearly label philosophically significant statements using:
+
+- **[Explicit]** — A claim directly made by the authors.
+- **[Implicit]** — A commitment or assumption reasonably reconstructed from their work.
+- **[Implication]** — A philosophical consequence supported by the paper's findings or claims.
+- **[Speculative]** — A possible philosophical interpretation or research direction extending beyond what the paper establishes.
+
+**2. Maintain textual accountability.**
+
+Provide page numbers, section references, definitions, equations, or brief quotations to substantiate important interpretations wherever the supplied material permits. Never invent quotations or citations.
+
+**3. Preserve conceptual and technical precision.**
+
+Avoid simplifying technical concepts in ways that change their meaning. When philosophical analysis depends on technical details, explain those details.
+
+**4. Avoid philosophical overinterpretation.**
+
+Do not treat every modeling choice as an ontological commitment, every operational definition as a complete philosophical theory, or every empirical success as confirmation of a metaphysical claim.
+
+**5. Examine alternative interpretations.**
+
+Whenever a philosophical interpretation is proposed, consider whether the same technical findings could be accommodated by rival conceptual frameworks.
+
+**6. Distinguish technical success from philosophical validation.**
+
+Successful prediction, simulation, optimization, or task performance does not automatically establish that a model's conceptualization of the phenomenon is correct. Examine what further reasoning would be needed to justify that inference.
+
+**7. Prioritize significance over exhaustiveness.**
+
+Focus on philosophically substantive issues. It is better to identify a few genuinely important conceptual insights and analyze them deeply than to produce an extensive collection of weak philosophical associations.
+
+**8. Separate reconstruction from criticism.**
+
+First articulate the authors' framework as charitably and accurately as possible. Only then evaluate its assumptions, limitations, and philosophical implications.
+
+**9. Read the entire technical apparatus philosophically.**
+
+Do not concentrate exclusively on the abstract, introduction, and discussion. Definitions, formal models, mathematical assumptions, experimental designs, measurement procedures, benchmarks, and evaluation criteria may contain the most philosophically significant commitments.
+
+## Final guiding instruction
+
+**Read the paper not simply for what its authors say about the phenomenon, but for what their technical work requires them to assume about the phenomenon, what their results genuinely establish, which alternative understandings remain possible, and what philosophical questions become visible through their investigation.**
+
+The purpose is to identify philosophical content already present in the technical work, reconstruct implicit commitments with care, and develop philosophically productive interpretations without confusing those three activities.
+
+---
+
+## Output: save as a Zettelkasten note
+
+Do NOT print the analysis in chat. Instead:
+
+1. **Title:** `<Short Paper Title>` in Title Case (no subtitle).
+2. **Filename:** the title lowercased, everything except letters, digits and spaces removed, spaces replaced with `-`, plus `.md`, in the inbox directory above. If the inbox directory doesn't exist, stop and report the error. If the file already exists, append `-2`, `-3`, … instead of overwriting.
+3. **Properties and tags:** keep `type`, `status` and `origin` exactly as in the structure below. Add 1–3 tags chosen **only** from this list (the approved and under-review tags in `~/notes/90_system/tags.md`): @TAGS@. Never invent a tag, and never use `resources`, `zettelkasten`, provenance or format tags. If no listed tag fits, use none (`tags: []`) and say so in your chat reply, suggesting the tag you would have wanted. Start the body on the line directly after the closing `---`, with no blank line in between.
+4. **Write the file** with exactly this structure:
+
+```markdown
+---
+title: "<Title>"
+created: <Timestamp from above>
+paper: "<Authors> (<Year>). <Full Paper Title>"
+source: "<absolute path to the PDF>"
+type: source
+status: developing
+origin: claude
+tags:
+  - <topic-tag>
+  - <topic-tag>
+---
+## <Title>
+
+### 1. Technical orientation
+...
+
+### 2. Central conceptual claims
+...
+
+### 3. Hidden conceptual commitments in technical choices
+...
+
+### 4. Philosophically significant assumptions
+...
+
+### 5. Important conceptual distinctions
+...
+
+### 6. Philosophically interesting arguments
+...
+
+### 7. Philosophical implications
+...
+
+### 8. Conceptual tensions, ambiguities, and unresolved problems
+...
+
+### 9. Connections to established philosophical debates
+...
+
+### 10. Philosophical research opportunities
+...
+
+### 11. Overall philosophical significance
+...
+
+### 12. Ranked philosophical findings (table)
+...
+
+## Connections
+
+
+## Sources
+
+- <Authors> (<Year>). *<Full Paper Title>*. <Venue or arXiv id>. <DOI/URL if given in the paper>.
+
+
+## Questions
+
+
+```
+
+Notes on the structure:
+- `## Connections` and `## Questions` are for me to fill in. Leave them empty: just the heading, nothing below it.
+- `## Sources` contains only the one line for the paper analyzed. Any other works you refer to (philosophers, debates, related papers) are cited inline where they come up (author, title, year).
+
+5. **Reply in chat** with only: the path of the note and a two-sentence summary of the paper.
+PROMPT

@@ -1,0 +1,392 @@
+#!/bin/bash
+# claude-chapter — deep analysis of a book chapter (or one passage of it) from a PDF,
+# saved as a Zettelkasten note.
+# Self-contained: the prompt is at the bottom of this file. Edit it there.
+#
+# Usage:
+#   claude-chapter                                  # asks for everything
+#   claude-chapter book.pdf 3                       # whole chapter 3
+#   claude-chapter book.pdf 3 45-72                 # optional: PDF page range (faster, more reliable)
+#   claude-chapter -f "paragraph 4" book.pdf 3      # just one passage, chapter as context
+#   claude-chapter -f "p. 52, paragraph 2" -p 45-72 book.pdf 3
+#   claude-chapter -f "the paragraph beginning 'Every moral philosophy'" book.pdf 15
+#   claude-chapter -f "section 3.2" book.pdf 3
+#
+# Options (must come before the PDF):
+#   -f FOCUS   paragraph, section or passage to analyze instead of the whole chapter
+#   -p PAGES   PDF page range, e.g. 45-72 (same as the third positional argument)
+set -euo pipefail
+
+ZET_DIR="$HOME/notes/00_inbox"
+TOOLS=(Read Write Glob WebSearch WebFetch "Bash(ls:*)" "Bash(pdfinfo:*)" "Bash(pdftotext:*)")
+
+die() { echo "Error: $*" >&2; exit 1; }
+
+command -v claude >/dev/null || die "claude CLI not found"
+[ -d "$ZET_DIR" ] || die "Zettelkasten directory not found at $ZET_DIR"
+
+# --- Options ----------------------------------------------------------------
+
+focus=""
+pages=""
+while getopts ":f:p:h" opt; do
+    case "$opt" in
+        f) focus="$OPTARG" ;;
+        p) pages="$OPTARG" ;;
+        h) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        :) die "Option -$OPTARG needs a value" ;;
+        \?) die "Unknown option -$OPTARG (options go before the PDF)" ;;
+    esac
+done
+shift $((OPTIND - 1))
+interactive=$(( $# == 0 ))
+
+# --- Inputs -----------------------------------------------------------------
+
+pdf="${1:-}"
+[ -n "$pdf" ] || read -e -r -p "PDF: " pdf
+pdf="${pdf/#\~/$HOME}"
+[ -f "$pdf" ] || die "PDF not found: $pdf"
+pdf_dir="$(cd "$(dirname "$pdf")" && pwd)"
+pdf_abs="$pdf_dir/$(basename "$pdf")"
+
+chapter="${2:-}"
+[ -n "$chapter" ] || read -r -p "Chapter (number or title): " chapter
+[ -n "$chapter" ] || die "No chapter given"
+[[ "$chapter" =~ ^[0-9]+$ ]] && chapter="Chapter $chapter"
+
+pages="${pages:-${3:-}}"
+if [ "$interactive" -eq 1 ]; then
+    [ -n "$pages" ] || read -r -p "PDF page range (optional, e.g. 45-72): " pages
+    [ -n "$focus" ] || read -r -p "Focus — paragraph, section or passage (optional): " focus
+fi
+if [ -n "$pages" ] && ! [[ "$pages" =~ ^[0-9]+-[0-9]+$ ]]; then
+    die "Page range must look like 45-72"
+fi
+
+# --- Build the prompt -------------------------------------------------------
+
+prompt=$(sed -n '/^: <<'"'"'PROMPT'"'"'$/,/^PROMPT$/{//!p}' "$0")
+prompt="${prompt//@INBOX@/$ZET_DIR}"
+prompt="${prompt//@TIMESTAMP@/$(date '+%Y-%m-%d %H:%M:%S')}"
+TAGS_FILE="$HOME/notes/90_system/tags.md"
+[ -f "$TAGS_FILE" ] || { echo "Error: tag list not found at $TAGS_FILE" >&2; exit 1; }
+allowed_tags=$(awk '/^### Approved/{f=1;next} /^### Aliases/{f=0} f && /^- /{sub(/^- /,""); gsub(/, */,"\n"); print}' "$TAGS_FILE" | paste -sd, | sed 's/,/, /g')
+[ -n "$allowed_tags" ] || { echo "Error: no tags found in $TAGS_FILE" >&2; exit 1; }
+prompt="${prompt//@TAGS@/$allowed_tags}"
+prompt="${prompt//@PDF@/$pdf_abs}"
+prompt="${prompt//@CHAPTER@/$chapter}"
+prompt="${prompt//@PAGES@/${pages:-none given}}"
+prompt="${prompt//@FOCUS@/${focus:-none given (analyze the whole chapter)}}"
+
+# --- Run --------------------------------------------------------------------
+
+marker=$(mktemp)
+trap 'rm -f "$marker"' EXIT
+
+what="$chapter"
+[ -n "$focus" ] && what="$focus in $chapter"
+echo "Analyzing $what of $(basename "$pdf") — this can take several minutes…"
+
+printf '%s' "$prompt" | claude -p \
+    ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"} \
+    --add-dir "$ZET_DIR" "$pdf_dir" \
+    --allowedTools "${TOOLS[@]}"
+
+# --- Open the new note ------------------------------------------------------
+
+note=$(find "$ZET_DIR" -maxdepth 1 -name '*.md' -newer "$marker" -print 2>/dev/null \
+       | xargs -r ls -t 2>/dev/null | head -1)
+[ -n "$note" ] || die "no new note found in $ZET_DIR"
+
+# --- Keep the note name unique across the vault (governance §4) -------------
+# Links resolve by file name, so a clash with any note elsewhere in ~/notes
+# breaks them. Rename the new note to <name>-2, -3, … until it is unique.
+VAULT="$HOME/notes"
+base=$(basename "$note" .md); name="$base"; n=2
+while find "$VAULT" -path "$VAULT/.git" -prune -o -iname "$name.md" ! -samefile "$note" -print -quit | grep -q .; do
+    name="$base-$n"; n=$((n + 1))
+done
+if [ "$name" != "$base" ]; then
+    new="$(dirname "$note")/$name.md"
+    mv -n "$note" "$new"
+    echo "Renamed to $name.md: a note named $base.md already exists in the vault."
+    note="$new"
+fi
+
+echo "$note" > /tmp/last_zettel
+
+if [ -z "${NVIM:-}" ]; then
+    nvim "$note"
+else
+    echo "(Not opening inside Neovim)"
+fi
+
+exit 0
+
+# --- Prompt (read by the script above; @PLACEHOLDERS@ are filled in at run time) ---
+
+: <<'PROMPT'
+# Deep Analysis of a Book Chapter
+
+## Context
+
+- PDF: @PDF@
+- Chapter: @CHAPTER@
+- PDF page range: @PAGES@
+- Focus within the chapter: @FOCUS@
+- Inbox directory: @INBOX@
+- Timestamp: @TIMESTAMP@
+
+## Step 1: Get the chapter
+
+- Run `pdfinfo "<pdf>"` to get the book's title and author. If the metadata is empty or a placeholder (e.g. "untitled", "anonymous", a .docx file name), take title and author from the title page instead.
+- If a page range was given, extract it with `pdftotext -layout -f <first> -l <last> "<pdf>" -`. If that returns no usable text (scanned PDF), read those pages with the Read tool instead (at most 20 pages per call).
+- If no page range was given, find the chapter via the table of contents, then read it. A bare number like `3` means chapter 3.
+- Read the entire chapter before analyzing it, even when a focus is given. If you cannot find the chapter or the PDF, stop and report the error.
+
+## Step 1b: Locate the focus (only if a focus is given)
+
+- The focus may be a paragraph number ("paragraph 4"), a page plus paragraph ("p. 52, paragraph 2", counting from the first paragraph that starts on that printed page), a section number or heading, or the opening words of a passage.
+- When counting paragraphs, count from the start of the chapter (or of the named section/page). Do not count headings, epigraphs, block quotations, footnotes, figure captions, or running heads. A paragraph broken across a page break is one paragraph; `pdftotext` line breaks are not paragraph breaks.
+- Note the printed page number(s) and the first few words of the passage you identified.
+- If the focus is ambiguous or matches nothing, do not guess: stop, write no note, and report in chat the candidate passages (page and opening words) so I can rerun with a more precise focus.
+
+## Step 2: Analyze
+
+I want to develop a deep, precise, critical, and interconnected understanding of this chapter.
+
+Help me understand not merely what the chapter says, but what the author is trying to accomplish, how the reasoning works, why the argument matters, how it connects to the wider book, and how independently justified its conclusions are.
+
+**If a focus is given**, the passage is the object of analysis and the rest of the chapter is context. Read every question below at the scale of the passage: section 1 asks what the passage does within the chapter's argument; section 2 reconstructs the passage's own reasoning, sentence by sentence where it is dense; section 4 walks through its internal moves; section 9 covers how it depends on what comes before it in the chapter and what later parts of the chapter or book rely on it. Pay particular attention to word choice, qualifications, and what each sentence contributes. A single paragraph rarely warrants long answers to all fourteen sections; keep every heading in the output, but where a section has nothing worthwhile to say at this scale, write one sentence saying so instead of padding. In section 14, 3–6 questions are enough.
+
+Structure your analysis around the following questions, adapting them to the content, genre, discipline, and purpose of the chapter rather than mechanically applying every question.
+
+**1. Chapter orientation: the big picture**
+- What is this chapter fundamentally about?
+- What central question, problem, or concern does it address?
+- What is the author's primary objective?
+- What is the central thesis, insight, discovery, or contribution?
+- Why did the author likely include this chapter?
+- What should a reader understand by the end that they might not have understood before?
+- What prior knowledge or concepts are necessary to follow the chapter?
+- What is the single most important thing to understand before examining the details?
+- Distinguish the chapter's topic from its actual contribution. A chapter about a subject is not necessarily making an important claim about that subject.
+- Conclude with a concise overview of the chapter's intellectual purpose.
+
+**2. The central argument and line of reasoning**
+- What is the main claim, and what supporting claims establish it?
+- What premises, evidence, examples, or intermediate conclusions connect those claims?
+- How does the argument progress from beginning to end, and which conclusions depend on which earlier claims?
+- What is assumed rather than explicitly established? What must be true for the reasoning to succeed?
+- Which steps are logically necessary, and which are plausible but not strictly necessary?
+- Where does the author move from description to explanation, interpretation, prediction, or recommendation?
+- Present the argument as a sequence of connected steps where appropriate.
+- Distinguish the author's actual argument from your reconstruction of it. If the reasoning is implicit, say that you are making the structure explicit rather than claiming the author stated it directly.
+- If the chapter is primarily narrative, descriptive, mathematical, empirical, or literary rather than argumentative, adapt this section accordingly.
+
+**3. Conceptual analysis: key ideas and distinctions**
+For each major concept:
+- Define it precisely in the context of the chapter, and explain it in plain language.
+- Identify the problem it helps solve or the distinction it helps establish.
+- Explain how it relates to the other key concepts.
+- Clarify what it means and what it does not mean, including common misunderstandings.
+- Say whether the author uses it in a conventional, technical, or distinctive way.
+
+Identify essential distinctions between concepts that may initially appear interchangeable. Where useful, organize the concepts into a hierarchy, taxonomy, causal model, or conceptual map. Do not produce a glossary of every unfamiliar term; focus on concepts necessary for understanding the reasoning.
+
+**4. Step-by-step explanation of how the chapter works**
+Break the chapter into its major intellectual movements or stages. For each stage:
+- What question or problem is being addressed?
+- What does the author claim or establish at this point, and how does the reasoning work?
+- Why is this step necessary, and how does it depend on what came before?
+- What new understanding does it introduce, and what remains unresolved?
+
+Explain causal mechanisms, logical dependencies, mathematical relationships, or interpretive moves where relevant. Reconstruct difficult passages in smaller steps rather than paraphrasing them. Use simple explanations first, then technical precision. If an inference is unclear, identify the ambiguity instead of silently repairing it.
+
+**5. Assumptions, foundations, and hidden commitments**
+- What explicit and implicit assumptions does the argument need?
+- What background beliefs, definitions, models, values, or methodological choices shape the analysis?
+- Which assumptions are widely accepted, which controversial? Which are justified within the chapter, which imported from elsewhere?
+- What happens if a key assumption is rejected? Does the author treat a disputed premise as established?
+- Are there alternative starting points that could produce different conclusions?
+
+Distinguish reasonable simplifications from assumptions that may undermine the argument. Do not infer hidden intentions or psychological motives without evidence.
+
+**6. Examples, illustrations, and applications**
+For the most important examples, case studies, thought experiments, analogies, or data:
+- What does the example illustrate, and precisely how does it support the author's point?
+- What does it establish, what does it not establish, and what are its limitations?
+- Where useful, provide a different example that tests whether the principle generalizes.
+
+Include, where relevant: a simple intuitive example, a realistic real-world application, a boundary case where the idea becomes less convincing, and a counterexample or thought experiment that tests the claim. Distinguish illustrative examples from empirical evidence.
+
+**7. Evidence, justification, and explanatory power**
+- What evidence, arguments, observations, data, sources, or experiences support the conclusions?
+- Is the evidence relevant and sufficient, and does the conclusion follow from it?
+- Does the author distinguish correlation from causation, possibility from probability, and explanation from speculation?
+- What alternative explanations could account for the same observations?
+- What can the chapter explain, predict, clarify, or help us do? What would count as evidence against it?
+- Which conclusions are strongly supported, tentatively supported, or insufficiently justified?
+
+Use standards of justification appropriate to the subject. Do not treat persuasive presentation as evidence, but do not demand empirical proof for claims whose justification is conceptual or logical.
+
+**8. Criticism, counterarguments, and alternatives**
+- What are the most serious weaknesses? Which objections challenge the central argument rather than peripheral details?
+- Are there counterexamples, unexplained cases, or internal tensions?
+- Does the argument rely on questionable generalizations, equivocations, false dichotomies, or unsupported causal claims?
+- What are the strongest competing explanations or frameworks, and how would a knowledgeable critic put the disagreement?
+- How might the author respond to the strongest objection, and does that response succeed?
+
+Distinguish genuine weaknesses from objections that merely reflect a different perspective. Represent competing positions fairly without assuming they are equally credible. Say what would strengthen the chapter.
+
+**9. Connections within the book**
+- How does this chapter build on, extend, qualify, revise, apply, or challenge earlier chapters?
+- What role does it play in the book's overall architecture: foundations, new framework, evidence, objections, implications?
+- How does it prepare the reader for later chapters? Does it create tensions with other parts of the book?
+
+Use the table of contents and surrounding material in the PDF where helpful. Clearly separate what can be inferred from the chapter itself from what would require reading more. Do not invent connections to chapters you have not read.
+
+**10. Connections beyond the book**
+For the most valuable connections to other ideas, theories, disciplines, traditions, or practical problems:
+- What do they share, where do they differ, and does one support, challenge, extend, or depend on the other?
+- What becomes clearer when they are considered together? Does the connection reveal a deeper principle, a limitation, or a new question?
+
+Distinguish historical influence from conceptual similarity. Do not claim influence without adequate evidence.
+
+**11. Implications, limitations, and scope**
+- If the central argument is correct, what follows, practically, theoretically, ethically, socially, institutionally?
+- Which implications follow directly, and which require further assumptions?
+- Under what conditions does the argument apply, and where might it fail or mislead?
+- What does the chapter not establish, despite what a reader might be tempted to conclude?
+
+Separate what the author explicitly claims from implications you derive.
+
+**12. Overall assessment and calibrated judgment**
+Evaluate clarity, internal coherence, quality of reasoning, strength of justification, usefulness, originality where assessable, awareness of limitations and competing views, and importance to the book's argument. Then:
+- What is the chapter's strongest contribution, and its most serious weakness?
+- Which claims should be accepted, provisionally accepted, questioned, or rejected?
+- What is the strongest defensible version of the author's position?
+- How much confidence is warranted, and what would most change the assessment?
+
+Distinguish the quality of the reasoning from whether the conclusions happen to be true. Avoid false precision in confidence or ratings.
+
+**13. Conceptual synthesis and mental model**
+Integrate the analysis rather than repeating each section in miniature:
+- **A. The chapter in plain language**, as if teaching an intelligent newcomer.
+- **B. The central insight** in one sentence.
+- **C. The argument map:** problem, assumptions, key concepts, reasoning, evidence, conclusions, limitations.
+- **D. The essential distinctions** needed to avoid misunderstanding.
+- **E. The most illuminating examples** (one or two) and why they work.
+- **F. The strongest criticism.**
+- **G. The knowledge boundary:** what the chapter clarifies, what remains uncertain, what lies beyond its scope.
+- **H. The lasting takeaway.**
+- **I. The next questions:** the most valuable unresolved questions or topics to investigate next.
+
+**14. Questions for active understanding**
+6–10 high-value questions testing genuine understanding rather than recall, organized into four levels: comprehension, reconstruction, critical evaluation, transfer and application. Where useful, include one question that challenges the central thesis and one that applies the chapter's framework to a new case. Do not provide answers; I will attempt them later.
+
+## Instructions for the analysis
+
+Begin with intuition and progressively develop greater precision and depth. Make the reasoning explicit rather than merely summarizing, classifying, or listing. Prioritize the chapter's central argument and contribution over minor details.
+
+Ground interpretations in the text and distinguish direct textual evidence from inference. Use quotations sparingly and accurately; never fabricate quotations or page references. Do not claim to have read material you have not read. Distinguish the author's position from your own analysis, interpretation, and criticism.
+
+Use reliable sources when factual, historical, or scholarly claims warrant them (use web search where it materially improves verification or context). Cite substantive claims inline and be transparent about uncertainty. Never invent citations: cite only sources you are confident exist, giving author, title and year. Say when a claim comes from general knowledge rather than from the chapter.
+
+Treat counterarguments seriously and present their strongest versions. Avoid repetition, superficial connections, unnecessary jargon, and artificial controversy. Omit irrelevant questions rather than forcing an answer. If essential context is missing, say so and proceed with what can reasonably be established. Do not confuse the amount of analysis with the quality of understanding.
+
+The ultimate goal is a mental model that lets me explain the chapter in my own words, reconstruct its reasoning, evaluate its claims independently, connect it to other knowledge, apply its insights appropriately, and see precisely where my understanding remains incomplete.
+
+---
+
+## Output: save as a Zettelkasten note
+
+Do NOT print the analysis in chat. Instead:
+
+1. **Title:** `<Book Short Title> — <Chapter>` in Title Case, using the chapter number if it has one, e.g. `After Virtue — Chapter 15`. If a focus is given, append a short label for it: `After Virtue — Chapter 15, Paragraph 4`, `After Virtue — Chapter 15, Page 204 Paragraph 2`, or `After Virtue — Chapter 15, Section 3`. The full chapter title goes in the `chapter` field.
+2. **Filename:** the title lowercased, everything except letters, digits and spaces removed, spaces replaced with `-`, plus `.md`, in the inbox directory above. If the inbox directory doesn't exist, stop and report the error. If the file already exists, append `-2`, `-3`, … instead of overwriting.
+3. **Properties and tags:** keep `type`, `status` and `origin` exactly as in the structure below. Add 1–3 tags chosen **only** from this list (the approved and under-review tags in `~/notes/90_system/tags.md`): @TAGS@. Never invent a tag, and never use `resources`, `zettelkasten`, provenance or format tags. If no listed tag fits, use none (`tags: []`) and say so in your chat reply, suggesting the tag you would have wanted. Start the body on the line directly after the closing `---`, with no blank line in between.
+4. **Write the file** with exactly this structure. The `passage` field and the `### The passage` section appear only if a focus is given; omit both otherwise.
+
+```markdown
+---
+title: "<Title>"
+created: <Timestamp from above>
+book: "<Full Title> by <Author>"
+chapter: "<Chapter number and title>"
+passage: "<p. <printed page(s)>, <paragraph/section as located>, beginning '<first few words>'>"
+source: "<absolute path to the PDF>"
+type: source
+status: developing
+origin: claude
+tags:
+  - <topic-tag>
+  - <topic-tag>
+---
+## <Title>
+
+### The passage
+<The passage quoted exactly as it appears. If it is longer than about 250 words, quote only its first and last sentences, joined by […].>
+
+### 1. Chapter orientation
+...
+
+### 2. The central argument and line of reasoning
+...
+
+### 3. Key ideas and distinctions
+...
+
+### 4. How the chapter works, step by step
+...
+
+### 5. Assumptions and hidden commitments
+...
+
+### 6. Examples, illustrations, and applications
+...
+
+### 7. Evidence, justification, and explanatory power
+...
+
+### 8. Criticism, counterarguments, and alternatives
+...
+
+### 9. Connections within the book
+...
+
+### 10. Connections beyond the book
+...
+
+### 11. Implications, limitations, and scope
+...
+
+### 12. Overall assessment
+...
+
+### 13. Conceptual synthesis (A–I)
+...
+
+### 14. Questions for active understanding (grouped by level, no answers)
+...
+
+## Connections
+
+
+## Sources
+
+- <Author> (<Year>). *<Full Title>*. <Publisher, if the PDF gives it>. <Chapter number and title><, p. <page(s)> if a focus is given>.
+
+
+## Questions
+
+
+```
+
+Notes on the structure:
+- `## Connections` and `## Questions` are for me to fill in. Leave them empty: just the heading, nothing below it.
+- `## Sources` contains only the one line for the book and chapter analyzed. Any other works you refer to are cited inline where they come up (author, title, year).
+
+5. **Reply in chat** with only: the path of the note and a two-sentence summary of the chapter (or, if a focus is given, of the passage and its role in the chapter).
+PROMPT
