@@ -1,7 +1,0 @@
-# HSTS 1.0 Known Hosts database for GNU Wget.
-# Edit at your own risk.
-# <hostname>	<port>	<incl. subdomains>	<created>	<max-age>
-archive.archlinux.org	0	1	1746827298	31536000
-downloads.nordcdn.com	0	1	1773315687	15552000
-codeberg.org	0	1	1744548799	63072000
-github.com	0	1	1745483144	31536000
