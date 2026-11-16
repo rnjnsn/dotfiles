@@ -3,4 +3,4 @@ from: markdown+wikilinks_title_after_pipe+mark
 to: docx
 metadata-files:
   - ${USERDATA}/metadata/defaults.yaml
-resource-path: [".", "${HOME}/notes/90_system/attachments"]
+resource-path: [".", "${HOME}/notes", "${HOME}/notes/90_system/attachments"]
