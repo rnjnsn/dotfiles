@@ -1,0 +1,2 @@
+# Fallbacks; a note's own front matter wins (e.g. lang: de for German hyphenation).
+lang: en

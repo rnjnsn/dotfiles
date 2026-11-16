@@ -1,0 +1,15 @@
+# pandoc -d pdf draft.md -o draft.pdf   (essays, articles: anything with footnotes)
+# Job applications use the WeasyPrint scripts (cv, app, pd, build.sh) instead.
+from: markdown+wikilinks_title_after_pipe+mark
+to: typst
+pdf-engine: typst
+metadata-files:
+  - ${USERDATA}/metadata/defaults.yaml
+resource-path: [".", "${HOME}/notes/90_system/attachments"]
+variables:
+  papersize: a4
+  fontsize: 11pt
+  linestretch: 1.2
+  margin:
+    x: 2.5cm
+    y: 2.5cm

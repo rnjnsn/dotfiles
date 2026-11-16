@@ -1,0 +1,6 @@
+# pandoc -d docx draft.md -o draft.docx   (for people who want Word / Google Docs)
+from: markdown+wikilinks_title_after_pipe+mark
+to: docx
+metadata-files:
+  - ${USERDATA}/metadata/defaults.yaml
+resource-path: [".", "${HOME}/notes/90_system/attachments"]

@@ -56,6 +56,12 @@ vim.keymap.set("n", "<leader>z", ":Zet<CR>", { noremap = true, silent = true })
 -- Writing mode setup
 require('writing')
 
+-- Footnote keys in markdown: Alt-n inline, Alt-l labeled, Alt-j jump
+require('footnotes')
+
+-- :Export [pdf|docx] -> ~/docs/exports (pandoc defaults in ~/.local/share/pandoc)
+require('export')
+
 -- Commands
 vim.api.nvim_create_user_command('Write', function()
   require('writing').setup()
