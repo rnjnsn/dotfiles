@@ -165,7 +165,7 @@ def account_froms():
             cur = w[1]
         elif w[0] == "from" and cur and len(w) >= 2:
             froms[cur] = w[1].lower()
-    return froms, default or next(iter(froms), "")
+    return froms, os.environ.get("M_ACCOUNT") or default or next(iter(froms), "")
 
 
 def draft_mode(d, drafts, files, o):
@@ -284,7 +284,7 @@ def main():
     al, done, accts = aliases(), sent_log(d), accounts()
     plan_f = d / ".mbatch-plan"
     if not plan_f.exists():
-        plan_f.write_text(default_plan(d, files, al, done, (o.account or (accts[0] if accts else ""))))
+        plan_f.write_text(default_plan(d, files, al, done, o.account or account_froms()[1]))
     elif o.account:
         plan_f.write_text(re.sub(r"(?m)^Account:.*$", f"Account: {o.account}", plan_f.read_text(), count=1))
 
