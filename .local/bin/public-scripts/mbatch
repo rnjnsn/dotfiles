@@ -1,0 +1,235 @@
+#!/usr/bin/python3
+"""mbatch — send each file in a folder to its own recipient (via `m`).
+
+  mbatch ~/docs/contracts            plan in nvim, review, send
+  mbatch -n ~/docs/contracts         review only, send nothing
+  mbatch --resend ~/docs/contracts   also re-send files already sent
+
+1. nvim opens a plan: account, subject, a message template, and one line
+   per file:  `file | recipient`  (alias or address; several with commas).
+   Recipients are pre-filled only when exactly one alias name appears in
+   the file name. Empty or deleted lines are skipped.
+2. You get a numbered review of file → exact address before anything is sent.
+3. Each file goes out as its own mail. Sent files are logged in
+   <folder>/.mbatch-sent and skipped on later runs; the plan is kept in
+   <folder>/.mbatch-plan so re-running reopens it.
+
+Template placeholders: {first} (first name), {name} (full name), {file}.
+"""
+import argparse, os, re, subprocess, sys, time
+from email.utils import getaddresses, formataddr
+from pathlib import Path
+
+HOME = Path.home()
+SEP = "-" * 60
+
+
+def die(msg, code=1):
+    print(f"mbatch: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def aliases():
+    al, f = {}, HOME / ".config/m/aliases"
+    if f.exists():
+        for line in f.read_text().splitlines():
+            parts = line.strip().split(None, 1)
+            if len(parts) == 2 and not parts[0].startswith("#"):
+                al[parts[0]] = parts[1].strip()
+    return al
+
+
+def accounts():
+    out = []
+    for line in (HOME / ".config/msmtp/config").read_text().splitlines():
+        w = line.split()
+        if len(w) >= 2 and w[0] == "account" and w[1] != "default":
+            out.append(w[1])
+    return out
+
+
+def guess(fname, al):
+    toks = set(re.split(r"[^a-z0-9]+", fname.lower()))
+    hits = [k for k, v in al.items()
+            if k.lower() in toks or any(t in toks for t in re.split(r"[^a-z0-9]+", getaddresses([v])[0][0].lower()) if len(t) > 2)]
+    return hits[0] if len(hits) == 1 else ""
+
+
+def sent_log(d):
+    f, done = d / ".mbatch-sent", {}
+    if f.exists():
+        for line in f.read_text().splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                done[parts[1]] = parts[2]
+    return done
+
+
+def default_plan(d, files, al, done, acct):
+    width = max(len(f.name) for f in files) + 2
+    rows = []
+    for f in files:
+        mark = f"   # already sent to {done[f.name]}" if f.name in done else ""
+        rows.append(f"{f.name:<{width}}| {guess(f.name, al)}{mark}")
+    return f"""# mbatch plan for {d}
+# One line per file:  file | recipient   (alias or address; several with commas)
+# Empty recipient or deleted line = skip. Lines starting with # are ignored.
+# Placeholders in the message: {{first}} {{name}} {{file}}
+Account: {acct}
+Subject: Your document
+{SEP}
+Hi {{first}},
+
+please find your document attached.
+
+Best regards,
+Rene
+{SEP}
+""" + "\n".join(rows) + "\n"
+
+
+def parse_plan(text):
+    parts = text.split(SEP)
+    if len(parts) != 3:
+        die(f"plan must keep the two '{SEP[:10]}…' separator lines")
+    head, body, table = parts
+    meta = {}
+    for line in head.splitlines():
+        if ":" in line and not line.startswith("#"):
+            k, v = line.split(":", 1)
+            meta[k.strip().lower()] = v.strip()
+    rows = []
+    for line in table.splitlines():
+        line = line.split("#", 1)[0].rstrip() if "   #" in line else line.rstrip()
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if "|" not in line:
+            die(f"line without '|': {line!r}")
+        f, r = line.split("|", 1)
+        rows.append((f.strip(), r.strip()))
+    return meta, body.strip("\n") + "\n", rows
+
+
+def fill(tmpl, name, fname):
+    return (tmpl.replace("{first}", (name.split() or [""])[0])
+                .replace("{name}", name).replace("{file}", fname))
+
+
+def resolve(r, al):
+    out = []
+    for part in (p.strip() for p in re.split(r",(?![^<]*>)", r)):
+        if part:
+            out.append(al.get(part, part))
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("folder")
+    ap.add_argument("-a", "--account")
+    ap.add_argument("-n", "--dry-run", action="store_true")
+    ap.add_argument("--resend", action="store_true")
+    o = ap.parse_args()
+
+    d = Path(o.folder).expanduser().resolve()
+    if not d.is_dir():
+        die(f"not a folder: {d}")
+    files = sorted(f for f in d.iterdir() if f.is_file() and not f.name.startswith("."))
+    if not files:
+        die("no files in folder")
+    al, done, accts = aliases(), sent_log(d), accounts()
+    plan_f = d / ".mbatch-plan"
+    if not plan_f.exists():
+        plan_f.write_text(default_plan(d, files, al, done, (o.account or (accts[0] if accts else ""))))
+    elif o.account:
+        plan_f.write_text(re.sub(r"(?m)^Account:.*$", f"Account: {o.account}", plan_f.read_text(), count=1))
+
+    while True:
+        with open("/dev/tty") as tty:
+            if subprocess.call([os.environ.get("EDITOR", "nvim"), "+set ft=mail", plan_f], stdin=tty) != 0:
+                die("cancelled", 0)
+        meta, tmpl, rows = parse_plan(plan_f.read_text())
+        acct, subj = meta.get("account", ""), meta.get("subject", "")
+
+        problems, jobs, names = [], [], {f.name for f in files}
+        if acct not in accts:
+            problems.append(f"unknown account {acct!r} (known: {', '.join(accts)})")
+        if not subj:
+            problems.append("empty Subject")
+        seen = {}
+        for fname, r in rows:
+            if fname not in names:
+                problems.append(f"no such file: {fname}")
+                continue
+            if not r:
+                continue
+            rc = resolve(r, al)
+            bad = [x for x in rc if "@" not in getaddresses([x])[0][1]]
+            if bad:
+                problems.append(f"{fname}: not an address or known alias: {', '.join(bad)}")
+                continue
+            if fname in done and not o.resend:
+                continue
+            jobs.append((fname, rc))
+            for x in rc:
+                seen.setdefault(getaddresses([x])[0][1].lower(), []).append(fname)
+        listed = {f for f, r in rows if r}
+        skipped = [f.name for f in files if f.name not in listed]
+        already = [f for f, r in rows if r and f in done and not o.resend]
+
+        print(f"\n[{acct}]  Subject: {subj}\n", file=sys.stderr)
+        for i, (fname, rc) in enumerate(jobs, 1):
+            print(f"  {i:>2}. {fname}\n      → {', '.join(rc)}", file=sys.stderr)
+        for addr, fs in seen.items():
+            if len(fs) > 1:
+                print(f"  ⚠ {addr} gets {len(fs)} files: {', '.join(fs)}", file=sys.stderr)
+        if already:
+            print(f"  ↷ already sent, skipping: {', '.join(already)}  (--resend to include)", file=sys.stderr)
+        if skipped:
+            print(f"  ○ no recipient, not sent: {', '.join(skipped)}", file=sys.stderr)
+        if jobs:
+            n0, rc0 = getaddresses([jobs[0][1][0]])[0]
+            ex = fill(tmpl, n0, jobs[0][0])
+            print(f"\n  Message as {jobs[0][0]}'s recipient sees it:\n" +
+                  "\n".join("    │ " + l for l in ex.splitlines()), file=sys.stderr)
+            if "{first}" in tmpl and any(not getaddresses([rc[0]])[0][0] for _, rc in jobs):
+                print("  ⚠ some recipients have no name, {first} will be empty (give them one in aliases)", file=sys.stderr)
+        for p in problems:
+            print(f"  ✗ {p}", file=sys.stderr)
+        if o.dry_run:
+            return
+        with open("/dev/tty") as tty:
+            if problems or not jobs:
+                print("\ne=edit plan  q=quit: ", end="", file=sys.stderr, flush=True)
+                ans = tty.readline().strip().lower()
+                if ans == "e" or ans == "":
+                    continue
+                die("nothing sent", 0)
+            print(f"\nSend {len(jobs)} separate mails? type 'yes' to send, e=edit, q=quit: ",
+                  end="", file=sys.stderr, flush=True)
+            ans = tty.readline().strip().lower()
+        if ans == "yes":
+            break
+        if ans == "e":
+            continue
+        die("nothing sent", 0)
+
+    ok = 0
+    for fname, rc in jobs:
+        n0 = getaddresses([rc[0]])[0][0]
+        body = fill(tmpl, n0, fname)
+        r = subprocess.run(["m", "-y", "-a", acct, "-s", subj, "-A", str(d / fname), ", ".join(rc)],
+                           input=body.encode(), capture_output=True)
+        if r.returncode == 0:
+            ok += 1
+            with open(d / ".mbatch-sent", "a") as f:
+                f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}\t{fname}\t{', '.join(rc)}\n")
+            print(f"  ✓ {fname} → {', '.join(rc)}", file=sys.stderr)
+        else:
+            print(f"  ✗ {fname}: {r.stderr.decode().strip()}", file=sys.stderr)
+    print(f"\n{ok}/{len(jobs)} sent. Log: {d / '.mbatch-sent'}", file=sys.stderr)
+    sys.exit(0 if ok == len(jobs) else 1)
+
+
+if __name__ == "__main__":
+    main()
