@@ -11,6 +11,7 @@
   cmd | m -s "log" bob        stdin becomes body, sends WITHOUT editor
   m -e ... / m -y ...         force editor / skip the confirm prompt
   m -n ...                    dry run: print the message, don't send
+  m --draft file.eml          send a finished draft (same format as the editor)
   m --complete str            address completion (used by aerc)
 
 Accounts and From addresses are read from ~/.config/msmtp/config.
@@ -177,6 +178,7 @@ def main():
     ap.add_argument("-y", "--yes", action="store_true")
     ap.add_argument("-n", "--dry-run", action="store_true")
     ap.add_argument("--complete")
+    ap.add_argument("--draft")
     ap.add_argument("-h", "--help", action="store_true")
     ap.add_argument("args", nargs="*")
     o = ap.parse_args()
@@ -223,6 +225,14 @@ def main():
     }
 
     use_editor = o.edit or not piped
+    base = Path.cwd()
+    if o.draft:  # a finished draft file in the editor format: headers, blank line, body
+        dp = Path(o.draft).expanduser()
+        hdr, body = parse(dp.read_text())
+        for h in ("To", "Cc", "Bcc"):
+            hdr[h] = expand([hdr.get(h, "")], aliases)
+        hdr["From"] = hdr.get("From") or accts[acct]
+        base, use_editor = dp.parent, o.edit
     while True:
         if use_editor:
             hdr, body = parse(edit(hdr, body))
@@ -230,6 +240,7 @@ def main():
                 hdr[h] = expand([hdr.get(h, "")], aliases)
         acct, hdr["From"] = account_for(hdr.get("From", ""), accts)
         attach = [Path(x.strip()).expanduser() for x in hdr.get("Attach", "").split(",") if x.strip()]
+        attach = [p if p.is_absolute() else base / p for p in attach]
         missing = [str(p) for p in attach if not p.is_file()]
         problem = ("no recipients" if not (hdr["To"] or hdr["Cc"] or hdr["Bcc"])
                    else f"attachment not found: {', '.join(missing)}" if missing

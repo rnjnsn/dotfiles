@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 """mbatch — send each file in a folder to its own recipient (via `m`).
 
-  mbatch ~/docs/contracts            plan in nvim, review, send
+  mbatch                             in a folder of finished drafts: review, send each
+  mbatch ~/docs/contracts            folder of documents: plan who gets which, review, send
   mbatch -n ~/docs/contracts         review only, send nothing
   mbatch --resend ~/docs/contracts   also re-send files already sent
 
@@ -15,6 +16,13 @@
    <folder>/.mbatch-plan so re-running reopens it.
 
 Template placeholders: {first} (first name), {name} (full name), {file}.
+
+Draft mode: if the folder holds draft files (text starting with From:/To:/
+Subject:… headers, a blank line, then the body, i.e. the format `m` opens),
+each draft is sent as written. From: may be an account name (rnjnsn) or
+empty (default account); Attach: paths are relative to the folder.
+Problems (no recipient, unknown alias, missing attachment) block sending
+and `e` opens the faulty drafts in nvim.
 """
 import argparse, os, re, subprocess, sys, time
 from email.utils import getaddresses, formataddr
@@ -123,9 +131,142 @@ def resolve(r, al):
     return out
 
 
+DRAFT_RE = re.compile(r"^(From|To|Cc|Bcc|Subject|Attach):", re.I)
+
+
+def is_draft(f):
+    try:
+        head = f.read_bytes()[:4096].decode("utf-8")
+    except Exception:
+        return False
+    lines = [l for l in head.splitlines() if l.strip()][:1]
+    return bool(lines and DRAFT_RE.match(lines[0])) and "\n\n" in head
+
+
+def parse_draft(text):
+    head, _, body = text.partition("\n\n")
+    hdr = {}
+    for line in head.splitlines():
+        if ":" in line:
+            k, v = line.split(":", 1)
+            hdr[k.strip().title()] = v.strip()
+    return hdr, body
+
+
+def account_froms():
+    froms, cur, default = {}, None, None
+    for line in (HOME / ".config/msmtp/config").read_text().splitlines():
+        w = line.split()
+        if not w or w[0].startswith("#"):
+            continue
+        if w[0] == "account" and len(w) >= 4 and w[1] == "default" and w[2] == ":":
+            default = w[3]
+        elif w[0] == "account" and len(w) >= 2:
+            cur = w[1]
+        elif w[0] == "from" and cur and len(w) >= 2:
+            froms[cur] = w[1].lower()
+    return froms, default or next(iter(froms), "")
+
+
+def draft_mode(d, drafts, files, o):
+    al = aliases()
+    froms, default = account_froms()
+    while True:
+        done = sent_log(d)
+        jobs, problems, attached, rcpt_seen = [], [], set(), {}
+        already = [f.name for f in drafts if f.name in done and not o.resend]
+        for f in drafts:
+            if f.name in already:
+                continue
+            hdr, body = parse_draft(f.read_text())
+            frm = hdr.get("From", "").strip()
+            if not frm:
+                acct = o.account or default
+            elif frm in froms:
+                acct = frm
+            else:
+                addr = getaddresses([frm])[0][1].lower()
+                acct = next((k for k, v in froms.items() if v == addr), None)
+            errs = []
+            if not acct:
+                errs.append(f"From: {frm!r} matches no account ({', '.join(froms)})")
+            rc = {h: resolve(hdr.get(h, ""), al) for h in ("To", "Cc", "Bcc")}
+            allr = rc["To"] + rc["Cc"] + rc["Bcc"]
+            if not allr:
+                errs.append("no recipients")
+            bad = [x for x in allr if "@" not in getaddresses([x])[0][1]]
+            if bad:
+                errs.append(f"not an address or known alias: {', '.join(bad)}")
+            att = [Path(x.strip()).expanduser() for x in hdr.get("Attach", "").split(",") if x.strip()]
+            att = [a if a.is_absolute() else d / a for a in att]
+            missing = [str(a) for a in att if not a.is_file()]
+            if missing:
+                errs.append(f"attachment not found: {', '.join(missing)}")
+            if not body.strip() and not att:
+                errs.append("empty message")
+            attached.update(a.resolve() for a in att if a.is_file())
+            for x in allr:
+                rcpt_seen.setdefault(getaddresses([x])[0][1].lower(), []).append(f.name)
+            if errs:
+                problems.append((f, errs))
+            jobs.append((f, acct, rc, hdr.get("Subject", ""), att))
+
+        print(f"\nDrafts in {d}:\n", file=sys.stderr)
+        for i, (f, acct, rc, subj, att) in enumerate(jobs, 1):
+            print(f"  {i:>2}. {f.name}   [{acct or '?'}]  {subj or '(no subject)'}", file=sys.stderr)
+            for h in ("To", "Cc", "Bcc"):
+                if rc[h]:
+                    print(f"      {h + ':':4} {', '.join(rc[h])}", file=sys.stderr)
+            for a in att:
+                print(f"      📎 {a.name}", file=sys.stderr)
+        for addr, fs in rcpt_seen.items():
+            if len(fs) > 1:
+                print(f"  ⚠ {addr} is in {len(fs)} drafts: {', '.join(fs)}", file=sys.stderr)
+        if already:
+            print(f"  ↷ already sent, skipping: {', '.join(already)}  (--resend to include)", file=sys.stderr)
+        others = [f.name for f in files if f not in drafts and f.resolve() not in attached]
+        if others:
+            print(f"  ○ not drafts and not attached anywhere, ignored: {', '.join(others)}", file=sys.stderr)
+        for f, errs in problems:
+            for e in errs:
+                print(f"  ✗ {f.name}: {e}", file=sys.stderr)
+        if o.dry_run:
+            return
+        with open("/dev/tty") as tty:
+            if problems or not jobs:
+                print("\n" + ("e=edit the drafts with problems  " if problems else "") + "q=quit: ",
+                      end="", file=sys.stderr, flush=True)
+                ans = tty.readline().strip().lower()
+                if problems and ans in ("e", ""):
+                    subprocess.call([os.environ.get("EDITOR", "nvim"), "-p"] + [str(f) for f, _ in problems], stdin=tty)
+                    continue
+                die("nothing sent", 0)
+            print(f"\nSend these {len(jobs)} drafts as {len(jobs)} separate mails? type 'yes' to send, q=quit: ",
+                  end="", file=sys.stderr, flush=True)
+            ans = tty.readline().strip().lower()
+        if ans == "yes":
+            break
+        die("nothing sent", 0)
+
+    ok = 0
+    for f, acct, rc, subj, att in jobs:
+        cmd = ["m", "-y", "--draft", str(f)] + (["-a", acct] if acct else [])
+        r = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True)
+        to = ", ".join(rc["To"] + rc["Cc"] + rc["Bcc"])
+        if r.returncode == 0:
+            ok += 1
+            with open(d / ".mbatch-sent", "a") as lf:
+                lf.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}\t{f.name}\t{to}\n")
+            print(f"  ✓ {f.name} → {to}", file=sys.stderr)
+        else:
+            print(f"  ✗ {f.name}: {r.stderr.decode().strip()}", file=sys.stderr)
+    print(f"\n{ok}/{len(jobs)} sent. Log: {d / '.mbatch-sent'}", file=sys.stderr)
+    sys.exit(0 if ok == len(jobs) else 1)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("folder")
+    ap.add_argument("folder", nargs="?", default=".")
     ap.add_argument("-a", "--account")
     ap.add_argument("-n", "--dry-run", action="store_true")
     ap.add_argument("--resend", action="store_true")
@@ -137,6 +278,9 @@ def main():
     files = sorted(f for f in d.iterdir() if f.is_file() and not f.name.startswith("."))
     if not files:
         die("no files in folder")
+    drafts = [f for f in files if is_draft(f)]
+    if drafts:
+        return draft_mode(d, drafts, files, o)
     al, done, accts = aliases(), sent_log(d), accounts()
     plan_f = d / ".mbatch-plan"
     if not plan_f.exists():
