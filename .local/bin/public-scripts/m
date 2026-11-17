@@ -6,7 +6,8 @@
   m -a proton bob             send from Proton
   m bob notes.md              notes.md becomes the body (still opens nvim)
   m bob report.pdf            non-text files are attached automatically
-  m -A notes.md bob           force-attach a text file
+  m bob ~/docs/contract/      a folder: every file in it (recursive) is attached
+  m -A notes.md bob           force-attach a text file (or folder)
   cmd | m -s "log" bob        stdin becomes body, sends WITHOUT editor
   m -e ... / m -y ...         force editor / skip the confirm prompt
   m -n ...                    dry run: print the message, don't send
@@ -94,6 +95,19 @@ def is_text(p):
         return False
 
 
+def dir_files(d):
+    """All regular files under d (recursive), skipping hidden files/dirs."""
+    return sorted(f for f in d.rglob("*")
+                  if f.is_file() and not any(x.startswith(".") for x in f.relative_to(d).parts))
+
+
+def human(n):
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024
+
+
 def account_for(from_hdr, accts):
     from_hdr = from_hdr.strip()
     if from_hdr in accts:
@@ -179,10 +193,15 @@ def main():
         die(f"fill in your addresses in {MSMTP_CONF} first")
 
     aliases = load_aliases()
-    rcpts, body, attach = [], "", [Path(a).expanduser() for a in o.attach]
+    rcpts, body, attach = [], "", []
+    for a in o.attach:
+        p = Path(a).expanduser()
+        attach.extend(dir_files(p) if p.is_dir() else [p])
     for a in o.args:
         p = Path(a).expanduser()
-        if p.is_file():
+        if p.is_dir():
+            attach.extend(dir_files(p))
+        elif p.is_file():
             if not body and is_text(p):
                 body = p.read_text()
                 o.subject = o.subject or p.name
@@ -215,8 +234,14 @@ def main():
         problem = ("no recipients" if not (hdr["To"] or hdr["Cc"] or hdr["Bcc"])
                    else f"attachment not found: {', '.join(missing)}" if missing
                    else "empty message" if not body.strip() and not attach else None)
-        n_att = f" +{len(attach)} attachment(s)" if attach else ""
+        total = sum(p.stat().st_size for p in attach if p.is_file())
+        n_att = f" +{len(attach)} attachment(s), {human(total)}" if attach else ""
         summary = f"[{acct}] → {hdr['To'] or hdr['Cc'] or hdr['Bcc']} | {hdr.get('Subject') or '(no subject)'}{n_att}"
+        details = [f"  From:    {hdr['From']}"] + [f"  {h + ':':8} {hdr[h]}" for h in ("To", "Cc", "Bcc") if hdr[h]]
+        details += [f"  Subject: {hdr.get('Subject') or '(no subject)'}"]
+        details += [f"  📎 {p.name}  ({human(p.stat().st_size)})" for p in attach if p.is_file()]
+        if total > 24 * 1024 * 1024:
+            details.append(f"  ⚠ attachments total {human(total)}: Gmail and Proton reject mail over ~25 MB")
         if o.dry_run:
             break
         if problem and not use_editor and o.yes:
@@ -228,7 +253,7 @@ def main():
                 print(f"⚠ {problem}", file=sys.stderr)
                 print("e=edit  q=quit: ", end="", file=sys.stderr, flush=True)
             else:
-                print(f"{summary}\nSend? [Enter]=send  e=edit  q=quit: ", end="", file=sys.stderr, flush=True)
+                print("\n".join(details) + "\nSend? [Enter]=send  e=edit  q=quit: ", end="", file=sys.stderr, flush=True)
             ans = tty.readline().strip().lower()
         if not problem and ans in ("", "y", "s"):
             break
