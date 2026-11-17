@@ -118,6 +118,33 @@ br() {
   fi
 }
 
+# lfcd: browse with lf, and the shell ends up in the folder you quit lf in.
+# Bound to Ctrl+O below.
+lfcd() {
+  local tmp dir
+  tmp=$(mktemp -u)
+  command lf -last-dir-path="$tmp" "$@"
+  if [[ -f $tmp ]]; then
+    dir=$(<"$tmp")
+    command rm -f -- "$tmp"
+    [[ -d $dir && $dir != "$PWD" ]] && cd -- "$dir"
+  fi
+}
+_lfcd_widget() {
+  zle push-line                 # keep any half-typed command for later
+  BUFFER=lfcd
+  zle accept-line
+}
+zle -N _lfcd_widget
+bindkey -M viins '^O' _lfcd_widget
+bindkey -M vicmd '^O' _lfcd_widget
+
+# Ctrl+E: open the current command line in $EDITOR (nvim); save & quit to run it.
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey -M viins '^E' edit-command-line
+bindkey -M vicmd '^E' edit-command-line
+
 # Clear a stale WAYLAND_DISPLAY/DISPLAY before starting a compositor
 _clear_stale_display_vars() {
   if [[ -n ${WAYLAND_DISPLAY:-} ]]; then

@@ -65,7 +65,7 @@ return {
     }
 
     local function create_znr_snippet()
-      local zettel_dir = vim.fn.expand("~/notes/3. zettelkasten")
+      local zettel_dir = vim.fn.expand("~/notes")
       local cmd = string.format('fd -e md -t f . "%s" --print0 | xargs -0 ls -t | sed -n "2p"', zettel_dir)
       local handle = io.popen(cmd)
       local recent_file = handle:read("*a"):gsub("\n", "")

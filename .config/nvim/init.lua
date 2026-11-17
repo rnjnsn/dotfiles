@@ -56,7 +56,8 @@ vim.keymap.set("n", "<leader>z", ":Zet<CR>", { noremap = true, silent = true })
 -- Writing mode setup
 require('writing')
 
--- Footnote keys in markdown: Alt-n inline, Alt-l labeled, Alt-j jump
+-- Footnotes in markdown: Ctrl-f (insert) new/toggle marker↔note, s hints,
+-- Enter peek/jump, ]f [f, <leader>nf/nr/nc (see lua/footnotes.lua header)
 require('footnotes')
 
 -- :Export [pdf|docx] -> ~/docs/exports (pandoc defaults in ~/.local/share/pandoc)

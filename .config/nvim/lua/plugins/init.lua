@@ -24,6 +24,9 @@ return {
         alpha = 0.25,
       },
       context = 10,
+      -- Dim by paragraph, not treesitter node. The 'pandoc' filetype has no
+      -- parser, and on nvim 0.12 twilight's treesitter check crashes :Write.
+      treesitter = false,
     }
   },
 }

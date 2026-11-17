@@ -12,7 +12,9 @@ return {
       sections = {
         lualine_c = {
           { 'filename' },
-          { function() return "Words: " .. vim.fn.wordcount().words end },
+          -- markdown: words and characters (with spaces) without footnotes,
+          -- frontmatter or markup; see lua/wordcount.lua
+          { function() return require('wordcount').statusline() end },
         }
       }
     })

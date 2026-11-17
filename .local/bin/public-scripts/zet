@@ -1,52 +1,64 @@
 #!/bin/bash
+# zet: create a new Zettelkasten note in ~/notes/00_inbox and open it in nvim.
 
-# Set the Zettelkasten directory
 ZET_DIR="$HOME/notes/00_inbox"
 
-# Function to convert title to lowercase with hyphens
+# Title -> file name: transliterate æøå/äöüß, lowercase, keep letters/digits, spaces -> hyphens
 sanitize_filename() {
-    echo "$1" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:] ' | tr ' ' '-'
+    echo "$1" \
+        | sed 's/æ/ae/g; s/Æ/Ae/g; s/ø/oe/g; s/Ø/Oe/g; s/å/aa/g; s/Å/Aa/g;
+               s/ä/ae/g; s/Ä/Ae/g; s/ö/oe/g; s/Ö/Oe/g; s/ü/ue/g; s/Ü/Ue/g; s/ß/ss/g' \
+        | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null \
+        | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:] -' \
+        | tr -s ' ' | sed 's/^ //; s/ $//' | tr ' ' '-'
 }
 
-# Function to convert title to Title Case
+# Title Case for the heading (works on æøå etc.)
 title_case() {
-    echo "$1" | awk 'BEGIN{FS=OFS=" "} {for(i=1;i<=NF;i++)sub(/./,toupper(substr($i,1,1)),$i)}1'
+    python3 -c 'import sys; print(" ".join(w[:1].upper() + w[1:] for w in sys.argv[1].split()))' "$1"
 }
 
-# Check if the directory exists
 if [ ! -d "$ZET_DIR" ]; then
     echo "Error: Zettelkasten directory not found at $ZET_DIR"
     exit 1
 fi
 
-# Prompt user for note title
 echo -n "Enter note title: "
-read input_title
+read -r input_title
+if [ -z "${input_title// }" ]; then
+    echo "No title given, nothing created."
+    exit 1
+fi
 
-# Sanitize filename and title
 filename_title=$(sanitize_filename "$input_title")
 content_title=$(title_case "$input_title")
-
-# Prompt user for additional tags
-echo -n "Enter additional tags (space-separated): "
-read additional_tags
-
-# Combine tags and format for YAML
-all_tags="resources zettelkasten $additional_tags"
-yaml_tags=$(echo "$all_tags" | sed 's/[[:space:]]\+/\n  - /g')
-
-# Build full path to new note
 filename="$ZET_DIR/$filename_title.md"
 
-# Create the markdown note
-cat > "$filename" << EOL
----
-title: "$content_title"
-created: $(date '+%Y-%m-%d %H:%M:%S')
-tags:
-  - ${yaml_tags}
----
+# Never overwrite an existing note
+if [ -e "$filename" ]; then
+    echo "A note with that name already exists: $filename"
+    echo "Opening it instead."
+else
+    echo -n "Enter additional tags (space-separated): "
+    read -r additional_tags
 
+    # One "  - tag" line per tag; empty input adds nothing
+    yaml_tags=""
+    for tag in $additional_tags; do
+        yaml_tags+="  - ${tag#\#}"$'\n'
+    done
+    [ -n "$yaml_tags" ] && yaml_tags="tags:"$'\n'"$yaml_tags"
+
+    # Escape double quotes for the YAML title
+    yaml_title=${content_title//\"/\\\"}
+
+    cat > "$filename" << EOL
+---
+title: "$yaml_title"
+created: $(date '+%Y-%m-%d %H:%M:%S')
+type: note
+status: stub
+${yaml_tags}---
 ## $content_title
 
 
@@ -60,16 +72,15 @@ tags:
 
 
 EOL
+    echo "Created note: $filename"
+fi
 
-# Save the note path so Neovim can open it
+# Save the note path so Neovim's :Zet can open it
 echo "$filename" > /tmp/last_zettel
-
-# Notify user and optionally open the note
-echo "Created note: $filename"
 
 # Only open in nvim if not already inside Neovim
 if [ -z "$NVIM" ]; then
-  nvim "$filename"
+    nvim "$filename"
 else
-  echo "(Not opening inside Neovim)"
+    echo "(Not opening inside Neovim)"
 fi

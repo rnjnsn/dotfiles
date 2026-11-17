@@ -1,0 +1,127 @@
+#!/bin/bash
+# claude-prompt — run a prompt from the Obsidian prompt library in Claude Code.
+#
+# Every prompt lives once, in ~/notes/90_system/prompts/<name>.md, and is reachable as:
+#   /<name> ...          inside Claude Code   (~/.claude/commands/<name>.md is a symlink)
+#   claude-<name> ...    in the terminal      (a symlink to this script)
+#   claude-prompt <name> ...                  (the same, spelled out)
+#   claude-prompt --list                      (list the prompts)
+#   claude-prompt --link                      (recreate all symlinks after adding/renaming a prompt)
+#
+# Input: the arguments; or a pipe; or, with neither, your editor opens to paste it.
+#
+# The prompt's front matter controls the run:
+#   allowed-tools: ...      tools Claude may use (same field Claude Code uses for /<name>)
+#   run: headless           claude -p, prints only the short reply (default)
+#   run: interactive        a normal Claude session, for prompts that may ask back
+#   output: note            the prompt writes a note to 00_inbox: it is checked for a
+#                           name clash, saved to /tmp/last_zettel and opened in nvim
+#   output: chat            the answer stays in the terminal (default)
+set -euo pipefail
+
+VAULT="$HOME/notes"
+PROMPTS="$VAULT/90_system/prompts"
+INBOX="$VAULT/00_inbox"
+BIN="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+CMDS="$HOME/.claude/commands"
+
+die() { echo "Error: $*" >&2; exit 1; }
+fm() { awk -v k="$2" 'NR==1 && /^---$/ {f=1; next} f && /^---$/ {exit} f && index($0, k": ")==1 {sub("^" k ": *", ""); gsub(/^"|"$/, ""); print}' "$1"; }
+
+[ -d "$PROMPTS" ] || die "prompt library not found at $PROMPTS"
+
+# --- Which prompt? ------------------------------------------------------------
+self=$(basename "$0")
+if [ "$self" = "claude-prompt" ]; then
+    case "${1:-}" in
+        ""|-h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --list)
+            for f in "$PROMPTS"/*.md; do
+                printf '%-22s %s\n' "$(basename "$f" .md)" "$(fm "$f" description)"
+            done; exit 0 ;;
+        --link)
+            mkdir -p "$CMDS"
+            for f in "$PROMPTS"/*.md; do
+                n=$(basename "$f" .md)
+                ln -sfn "$f" "$CMDS/$n.md"
+                ln -sfn claude-prompt "$BIN/claude-$n"
+                echo "/$n  claude-$n  → $f"
+            done
+            # remove links whose prompt no longer exists
+            for l in "$CMDS"/*.md "$BIN"/claude-*; do
+                [ -L "$l" ] && [ ! -e "$l" ] && { rm "$l"; echo "removed stale link $l"; }
+            done
+            exit 0 ;;
+    esac
+    name="$1"; shift
+else
+    name="${self#claude-}"
+fi
+file="$PROMPTS/$name.md"
+[ -f "$file" ] || die "no prompt '$name' in $PROMPTS (claude-prompt --list)"
+command -v claude >/dev/null || die "claude CLI not found"
+
+run=$(fm "$file" run); run="${run:-headless}"
+output=$(fm "$file" output); output="${output:-chat}"
+hint=$(fm "$file" argument-hint)
+IFS=',' read -r -a tools <<< "$(fm "$file" allowed-tools)"
+for i in "${!tools[@]}"; do tools[$i]="$(echo "${tools[$i]}" | sed 's/^ *//; s/ *$//')"; done
+
+# --- Input --------------------------------------------------------------------
+if [ $# -gt 0 ]; then
+    input="$*"
+elif [ ! -t 0 ]; then
+    input=$(cat)
+else
+    tmp=$(mktemp "${TMPDIR:-/tmp}/claude-input.XXXXXX.md")
+    printf '%%%% %s\n%%%% Input: %s\n%%%% Lines starting with %%%% are ignored. Save and quit to run; quit without text to cancel.\n\n' \
+        "$(fm "$file" description)" "$hint" > "$tmp"
+    "${EDITOR:-nvim}" "$tmp"
+    input=$(grep -v '^%%' "$tmp" || true)
+    rm -f "$tmp"
+fi
+[ -n "${input//[[:space:]]/}" ] || die "no input (expected: $hint)"
+
+# Let Claude read any local file named in the input (PDFs, reports, job ads).
+dirs=("$VAULT")
+for w in $input "$input" "${input%% -- *}"; do
+    p="${w/#\~/$HOME}"
+    [ -e "$p" ] && dirs+=("$(cd "$(dirname "$p")" && pwd)")
+done
+add_dirs=(); for d in $(printf '%s\n' "${dirs[@]}" | sort -u); do add_dirs+=(--add-dir "$d"); done
+
+# --- Prompt: the file's body with $ARGUMENTS filled in, as /<name> would get it --
+body=$(awk 'NR==1 && /^---$/ {f=1; next} f && /^---$/ {f=0; next} !f' "$file")
+shopt -u patsub_replacement 2>/dev/null || true   # keep "&" literal in bash 5.2+
+prompt="${body//\$ARGUMENTS/$input}"
+
+# --- Run ----------------------------------------------------------------------
+marker=$(mktemp); trap 'rm -f "$marker"' EXIT
+cd "$VAULT"
+if [ "$run" = "interactive" ]; then
+    echo "Opening Claude ($name). Exit Claude (/exit or Ctrl+D) when done."
+    claude "$prompt" ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"} "${add_dirs[@]}" --allowedTools "${tools[@]}"
+else
+    echo "Running $name… this can take several minutes."
+    printf '%s' "$prompt" | claude -p ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"} "${add_dirs[@]}" --allowedTools "${tools[@]}"
+fi
+
+[ "$output" = "note" ] || exit 0
+
+# --- Find the new note, keep its name unique (governance §4), open it -----------
+note=$(find "$INBOX" -maxdepth 1 -name '*.md' -newer "$marker" -print0 2>/dev/null | xargs -0 -r ls -t 2>/dev/null | head -1)
+[ -n "$note" ] || die "no new note found in $INBOX"
+
+base=$(basename "$note" .md); nm="$base"; n=2
+while find "$VAULT" -path "$VAULT/.git" -prune -o -iname "$nm.md" ! -samefile "$note" -print -quit | grep -q .; do
+    nm="$base-$n"; n=$((n + 1))
+done
+if [ "$nm" != "$base" ]; then
+    new="$(dirname "$note")/$nm.md"; mv -n "$note" "$new"
+    echo "Renamed to $nm.md: a note named $base.md already exists in the vault."
+    note="$new"
+fi
+
+echo "$note" > /tmp/last_zettel
+echo "Created note: $note"
+if [ -z "${NVIM:-}" ] && [ -t 1 ]; then nvim "$note"; else echo "(Not opening inside Neovim)"; fi
