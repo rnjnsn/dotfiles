@@ -1,0 +1,261 @@
+#!/usr/bin/python3
+"""m — write & send mail from the terminal (nvim + msmtp).
+
+  m                           compose in nvim (default account)
+  m bob                       compose to alias/address
+  m -a proton bob             send from Proton
+  m bob notes.md              notes.md becomes the body (still opens nvim)
+  m bob report.pdf            non-text files are attached automatically
+  m -A notes.md bob           force-attach a text file
+  cmd | m -s "log" bob        stdin becomes body, sends WITHOUT editor
+  m -e ... / m -y ...         force editor / skip the confirm prompt
+  m -n ...                    dry run: print the message, don't send
+  m --complete str            address completion (used by aerc)
+
+Accounts and From addresses are read from ~/.config/msmtp/config.
+In the editor, edit From:/To:/Cc:/Bcc:/Subject:/Attach: freely
+(From: may be just "gmail" or "proton"; Attach: is comma-separated paths).
+Quit nvim with :cq to cancel.  Aliases: ~/.config/m/aliases
+"""
+import argparse, mimetypes, os, re, subprocess, sys, tempfile, time
+from email.message import EmailMessage
+from email.utils import formatdate, make_msgid, getaddresses, formataddr
+from pathlib import Path
+
+HOME = Path.home()
+MSMTP_CONF = HOME / ".config/msmtp/config"
+CONF = HOME / ".config/m"
+DATA = HOME / ".local/share/m"
+HEADERS = ["From", "To", "Cc", "Bcc", "Subject", "Attach"]
+
+
+def die(msg, code=1):
+    print(f"m: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def load_accounts():
+    """Parse msmtp config -> ({account: 'Name <addr>'}, default_account)."""
+    name_f = CONF / "name"
+    name = name_f.read_text().strip() if name_f.exists() else ""
+    accts, cur, default = {}, None, None
+    for line in MSMTP_CONF.read_text().splitlines():
+        w = line.split()
+        if not w or w[0].startswith("#"):
+            continue
+        if w[0] == "account" and len(w) >= 4 and w[1] == "default" and w[2] == ":":
+            default = w[3]
+        elif w[0] == "account" and len(w) >= 2:
+            cur = w[1]
+        elif w[0] == "from" and cur and len(w) >= 2:
+            accts[cur] = formataddr((name, w[1])) if name else w[1]
+    return accts, os.environ.get("M_ACCOUNT", default or next(iter(accts), None))
+
+
+def load_aliases():
+    al, f = {}, CONF / "aliases"
+    if f.exists():
+        for line in f.read_text().splitlines():
+            parts = line.strip().split(None, 1)
+            if len(parts) == 2 and not parts[0].startswith("#"):
+                al[parts[0]] = parts[1].strip()
+    return al
+
+
+def expand(addrs, aliases):
+    out = []
+    for a in addrs:
+        for part in (p.strip() for p in re.split(r",(?![^<]*>)", a)):
+            if part:
+                out.append(aliases.get(part, part))
+    return ", ".join(out)
+
+
+def complete(q):
+    q, seen, rows = q.lower(), set(), []
+    hist = DATA / "addresses"
+    lines = list(load_aliases().values()) + (hist.read_text().splitlines() if hist.exists() else [])
+    for name, addr in getaddresses(lines):
+        if addr and addr.lower() not in seen and (q in addr.lower() or q in name.lower()):
+            seen.add(addr.lower())
+            rows.append(f"{addr}\t{name}")
+    print("\n".join(rows))
+
+
+def is_text(p):
+    mt, _ = mimetypes.guess_type(str(p))
+    if mt and (mt.startswith("text/") or mt in ("application/json", "application/xml")):
+        return True
+    try:
+        chunk = p.read_bytes()[:4096]
+        chunk.decode("utf-8")
+        return b"\0" not in chunk
+    except Exception:
+        return False
+
+
+def account_for(from_hdr, accts):
+    from_hdr = from_hdr.strip()
+    if from_hdr in accts:
+        return from_hdr, accts[from_hdr]
+    addr = getaddresses([from_hdr])[0][1].lower()
+    for k, v in accts.items():
+        if getaddresses([v])[0][1].lower() == addr:
+            return k, from_hdr
+    die(f"no msmtp account matches From: {from_hdr!r} (known: {', '.join(accts)})")
+
+
+def edit(hdr, body):
+    sig_f = CONF / "signature"
+    sig = ("\n\n-- \n" + sig_f.read_text().rstrip() + "\n") if sig_f.exists() and not body else ""
+    text = "".join(f"{h}: {hdr.get(h, '')}\n" for h in HEADERS) + "\n" + body + sig
+    fd, path = tempfile.mkstemp(prefix="m-", suffix=".eml")
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    # cursor: To: if empty, else Subject: if empty, else first body line
+    line = 2 if not hdr.get("To") else 5 if not hdr.get("Subject") else len(HEADERS) + 2
+    with open("/dev/tty") as tty:
+        rc = subprocess.call([os.environ.get("EDITOR", "nvim"), f"+{line}", "+startinsert!", path], stdin=tty)
+    edited = Path(path).read_text()
+    os.unlink(path)
+    if rc != 0:
+        die("cancelled", 0)
+    return edited
+
+
+def parse(text):
+    head, _, body = text.partition("\n\n")
+    hdr = {}
+    for line in head.splitlines():
+        if ":" in line:
+            k, v = line.split(":", 1)
+            hdr[k.strip().title()] = v.strip()
+    return hdr, body
+
+
+def build(hdr, body, attach):
+    msg = EmailMessage()
+    msg["From"] = hdr["From"]
+    for h in ("To", "Cc", "Bcc"):
+        if hdr.get(h):
+            msg[h] = hdr[h]
+    msg["Subject"] = hdr.get("Subject", "")
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=getaddresses([hdr["From"]])[0][1].split("@")[-1])
+    msg.set_content(body.rstrip() + "\n")
+    for p in attach:
+        mt, enc = mimetypes.guess_type(str(p))
+        if mt is None or enc:
+            mt = "application/octet-stream"
+        maj, sub = mt.split("/", 1)
+        msg.add_attachment(p.read_bytes(), maintype=maj, subtype=sub, filename=p.name)
+    return msg
+
+
+def main():
+    ap = argparse.ArgumentParser(add_help=False)
+    ap.add_argument("-a", "--account")
+    ap.add_argument("-s", "--subject", default="")
+    ap.add_argument("-c", "--cc", action="append", default=[])
+    ap.add_argument("-b", "--bcc", action="append", default=[])
+    ap.add_argument("-A", "--attach", action="append", default=[])
+    ap.add_argument("-e", "--edit", action="store_true")
+    ap.add_argument("-y", "--yes", action="store_true")
+    ap.add_argument("-n", "--dry-run", action="store_true")
+    ap.add_argument("--complete")
+    ap.add_argument("-h", "--help", action="store_true")
+    ap.add_argument("args", nargs="*")
+    o = ap.parse_args()
+    if o.help:
+        print(__doc__.strip()); return
+    if o.complete is not None:
+        complete(o.complete); return
+
+    accts, default = load_accounts()
+    acct = o.account or default
+    if acct not in accts:
+        die(f"unknown account {acct!r} (known: {', '.join(accts)})")
+    if any("_ADDRESS" in v for v in accts.values()):
+        die(f"fill in your addresses in {MSMTP_CONF} first")
+
+    aliases = load_aliases()
+    rcpts, body, attach = [], "", [Path(a).expanduser() for a in o.attach]
+    for a in o.args:
+        p = Path(a).expanduser()
+        if p.is_file():
+            if not body and is_text(p):
+                body = p.read_text()
+                o.subject = o.subject or p.name
+            else:
+                attach.append(p)
+        else:
+            rcpts.append(a)
+    piped = not sys.stdin.isatty()
+    if piped:
+        body = sys.stdin.read() + (("\n" + body) if body else "")
+
+    hdr = {
+        "From": accts[acct],
+        "To": expand(rcpts, aliases),
+        "Cc": expand(o.cc, aliases),
+        "Bcc": expand(o.bcc, aliases),
+        "Subject": o.subject,
+        "Attach": ", ".join(str(p) for p in attach),
+    }
+
+    use_editor = o.edit or not piped
+    while True:
+        if use_editor:
+            hdr, body = parse(edit(hdr, body))
+            for h in ("To", "Cc", "Bcc"):
+                hdr[h] = expand([hdr.get(h, "")], aliases)
+        acct, hdr["From"] = account_for(hdr.get("From", ""), accts)
+        attach = [Path(x.strip()).expanduser() for x in hdr.get("Attach", "").split(",") if x.strip()]
+        missing = [str(p) for p in attach if not p.is_file()]
+        problem = ("no recipients" if not (hdr["To"] or hdr["Cc"] or hdr["Bcc"])
+                   else f"attachment not found: {', '.join(missing)}" if missing
+                   else "empty message" if not body.strip() and not attach else None)
+        n_att = f" +{len(attach)} attachment(s)" if attach else ""
+        summary = f"[{acct}] → {hdr['To'] or hdr['Cc'] or hdr['Bcc']} | {hdr.get('Subject') or '(no subject)'}{n_att}"
+        if o.dry_run:
+            break
+        if problem and not use_editor and o.yes:
+            die(problem)
+        if o.yes and not problem:
+            break
+        with open("/dev/tty") as tty:
+            if problem:
+                print(f"⚠ {problem}", file=sys.stderr)
+                print("e=edit  q=quit: ", end="", file=sys.stderr, flush=True)
+            else:
+                print(f"{summary}\nSend? [Enter]=send  e=edit  q=quit: ", end="", file=sys.stderr, flush=True)
+            ans = tty.readline().strip().lower()
+        if not problem and ans in ("", "y", "s"):
+            break
+        if ans == "e" or (problem and ans == ""):
+            use_editor = True
+            continue
+        die("not sent", 0)
+
+    msg = build(hdr, body, attach)
+    if o.dry_run:
+        print(summary, file=sys.stderr)
+        sys.stdout.write(msg.as_string()); return
+
+    r = subprocess.run(["msmtp", "-a", acct, "-t"], input=msg.as_bytes())
+    if r.returncode != 0:
+        (DATA / "failed").mkdir(parents=True, exist_ok=True)
+        keep = DATA / "failed" / time.strftime("%Y%m%d-%H%M%S.eml")
+        keep.write_bytes(msg.as_bytes())
+        die(f"msmtp failed (exit {r.returncode}); message saved to {keep}\n"
+            f"   retry: msmtp -a {acct} -t < {keep}")
+    DATA.mkdir(parents=True, exist_ok=True)
+    with open(DATA / "addresses", "a") as f:
+        for name, addr in getaddresses([hdr["To"], hdr["Cc"], hdr["Bcc"]]):
+            if addr:
+                f.write(formataddr((name, addr)) + "\n")
+    print(f"✓ sent {summary}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

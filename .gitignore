@@ -11,3 +11,9 @@
 
 # wget download history
 .wget-hsts
+
+# Mail: real configs hold addresses; .example copies are tracked
+.config/msmtp/config
+.config/aerc/accounts.conf
+.config/m/aliases
+.config/m/signature

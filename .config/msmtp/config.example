@@ -1,0 +1,34 @@
+# Copy to config (chmod 600) and replace the *_ADDRESS placeholders.
+# msmtp — used by `m` and aerc. Passwords come from `pass`.
+defaults
+auth on
+tls on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile ~/.local/share/m/msmtp.log
+
+account gmail
+host smtp.gmail.com
+port 587
+tls_starttls on
+from GMAIL_ADDRESS
+user GMAIL_ADDRESS
+passwordeval pass show mail/gmail-app | head -n1
+
+# Proton Mail Bridge (local, self-signed cert; traffic never leaves localhost)
+account proton
+host 127.0.0.1
+port 1025
+tls_starttls on
+tls_certcheck off
+from PROTON_ADDRESS
+user PROTON_ADDRESS
+passwordeval pass show mail/proton-bridge | head -n1
+
+# Other Proton addresses: same bridge login, different From
+account rnjnsn : proton
+from DOMAIN_ADDRESS
+
+account pm : proton
+from PM_ADDRESS
+
+account default : gmail
