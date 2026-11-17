@@ -107,3 +107,64 @@ menupopup, panel { --panel-background: #282828 !important; --panel-color: #ebdbb
 
 /* the vertical-tabs sidebar sits directly on #browser */
 #browser, #sidebar-main, #sidebar-box, #sidebar { background-color: #32302f !important; color: #ebdbb2 !important; }
+
+/* Tab numbers (2026-11-17): every tab shows its position. In Vimium C,
+   type the number then g0 to jump there (12g0 = tab 12).
+   Expanded sidebar / horizontal tabs: number before the icon.
+   Collapsed (icon-only) sidebar and pinned tabs: small badge on the icon's
+   bottom-right corner, so it takes no width. */
+#tabbrowser-tabs { counter-reset: tabnum; }
+.tabbrowser-tab { counter-increment: tabnum; }
+.tabbrowser-tab .tab-content::before {
+  content: counter(tabnum);
+  min-width: 1.8em;
+  margin-inline-end: 6px;
+  text-align: end;
+  font-weight: bold;
+  font-size: 0.9em;
+  color: #a89984;
+}
+.tabbrowser-tab[selected] .tab-content::before { color: #fabd2f; }
+
+/* Collapsed (icon-only) sidebar and pinned tabs: tiny number left of the
+   icon, fixed width so the icons stay in one straight column. */
+#tabbrowser-tabs[orient="vertical"]:not([expanded]) .tabbrowser-tab .tab-content,
+.tabbrowser-tab[pinned] .tab-content {
+  justify-content: center;
+  padding-inline: 0 !important;
+}
+#tabbrowser-tabs[orient="vertical"]:not([expanded]) .tabbrowser-tab .tab-content::before,
+.tabbrowser-tab[pinned] .tab-content::before {
+  min-width: 11px;
+  margin-inline-end: 3px;
+  font-size: 9px;
+}
+
+/* Square page corner (2026-11-17): the revamped sidebar rounds the page
+   area's top-left corner next to the tabs; keep it square. */
+.browserContainer { --content-area-start-radius: 0 !important; }
+#tabbrowser-tabbox, #tabbrowser-tabpanels, .browserContainer,
+.browserStack, .browserStack > browser { border-radius: 0 !important; }
+
+/* Sidebar cleanup (2026-11-17): no "+" new-tab button (Ctrl+T / Vimium t)
+   and no "Customize sidebar" gear. The gear is only made invisible: with
+   display:none Firefox thinks it overflowed and shows a "»" button instead.
+   (The passwords key is turned off in user.js.) */
+#vertical-tabs-newtab-button, #tabs-newtab-button { display: none !important; }
+moz-button[view="viewCustomizeSidebar"] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+/* The (now empty) tools area under the tabs keeps a minimum height built from
+   these two variables; zero them so the tab list reaches the bottom. */
+sidebar-main {
+  --button-min-height: 0px !important;
+  --space-small: 0px !important;
+}
+
+/* Bookmarks bar (2026-11-17): same space below the bookmarks as above them */
+#PersonalToolbar { padding-bottom: 4px !important; }

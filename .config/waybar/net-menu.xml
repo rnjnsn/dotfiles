@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Dropdown for the NET module (left click). Actions live in config "menu-actions". -->
+<interface>
+  <object class="GtkMenu" id="menu">
+    <child><object class="GtkMenuItem" id="hotspot"><property name="label">Phone hotspot</property></object></child>
+    <child><object class="GtkMenuItem" id="pick"><property name="label">Choose Wi-Fi…</property></object></child>
+    <child><object class="GtkSeparatorMenuItem" id="sep1"/></child>
+    <child><object class="GtkMenuItem" id="disconnect"><property name="label">Disconnect</property></object></child>
+    <child><object class="GtkMenuItem" id="wifi"><property name="label">Wi-Fi on/off</property></object></child>
+    <child><object class="GtkSeparatorMenuItem" id="sep2"/></child>
+    <child><object class="GtkMenuItem" id="tui"><property name="label">Open nmtui</property></object></child>
+  </object>
+</interface>

@@ -1,25 +1,36 @@
 {
   "layer": "top",
   "position": "top",
-  "modules-left": ["sway/workspaces"],
+  "modules-left": ["sway/workspaces", "sway/mode"],
   "modules-center": ["sway/window"],
   "modules-right": [
-    "custom/pomodoro", "idle_inhibitor", "cpu", "custom/disk", "memory",
-    "network", "wireplumber", "backlight", "battery",
-    "sway/language", "tray", "clock"
+    "custom/hint-timer", "custom/timer", "idle_inhibitor", "cpu", "custom/disk", "memory",
+    "custom/hint-net", "network", "custom/hint-vol", "wireplumber", "backlight", "battery",
+    "custom/hint-lang", "sway/language", "custom/hint-vpn", "tray", "clock"
   ],
   "sway/window": {
     "format": "{}",
     "max-length": 50
   },
 
-  "custom/pomodoro": {
-    "exec": "~/.config/waybar/scripts/pomodoro.sh",
+  "custom/hint-timer": {"exec": "~/.config/waybar/scripts/hint.sh 't d'", "interval": "once", "signal": 12, "return-type": "json", "tooltip": false},
+  "custom/hint-net": {"exec": "~/.config/waybar/scripts/hint.sh 'h w'", "interval": "once", "signal": 12, "return-type": "json", "tooltip": false},
+  "custom/hint-vol": {"exec": "~/.config/waybar/scripts/hint.sh 'p'", "interval": "once", "signal": 12, "return-type": "json", "tooltip": false},
+  "custom/hint-lang": {"exec": "~/.config/waybar/scripts/hint.sh 'k'", "interval": "once", "signal": 12, "return-type": "json", "tooltip": false},
+  "custom/hint-vpn": {"exec": "~/.config/waybar/scripts/hint.sh 'v'", "interval": "once", "signal": 12, "return-type": "json", "tooltip": false},
+  "sway/mode": {
+    "format": "{}",
+    "tooltip": false
+  },
+
+  "custom/timer": {
+    "exec": "~/.config/waybar/scripts/timer.sh",
     "interval": 1,
     "format": "{}",
     "tooltip": true,
     "return-type": "json",
-    "on-click": "~/.config/waybar/scripts/pomodoro.sh toggle",
+    "on-click": "~/.config/waybar/scripts/timer.sh toggle",
+    "on-click-right": "~/.config/waybar/scripts/timer.sh length",
     "signal": 10
   },
   "idle_inhibitor": {
@@ -53,7 +64,15 @@
     "format-disconnected": "NET down",
     "tooltip-format-wifi": "{ifname}: {ipaddr}/{cidr}\n{essid} ({signalStrength}%, {frequency} GHz)\n↓ {bandwidthDownBytes}  ↑ {bandwidthUpBytes}",
     "tooltip-format-ethernet": "{ifname}: {ipaddr}/{cidr}\n↓ {bandwidthDownBytes}  ↑ {bandwidthUpBytes}",
-    "on-click": "foot -e nmtui",
+    "menu": "on-click",
+    "menu-file": "~/.config/waybar/net-menu.xml",
+    "menu-actions": {
+      "hotspot": "~/.config/waybar/scripts/net.sh hotspot",
+      "pick": "~/.config/waybar/scripts/net.sh pick",
+      "disconnect": "~/.config/waybar/scripts/net.sh disconnect",
+      "wifi": "~/.config/waybar/scripts/net.sh wifi",
+      "tui": "~/.config/waybar/scripts/net.sh tui"
+    },
     "interval": 5
   },
   "wireplumber": {

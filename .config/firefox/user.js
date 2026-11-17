@@ -46,3 +46,4 @@ user_pref("datareporting.healthreport.uploadEnabled", false);
 user_pref("datareporting.policy.dataSubmissionEnabled", false);
 user_pref("app.shield.optoutstudies.enabled", false);
 user_pref("browser.discovery.enabled", false);
+user_pref("browser.contextual-password-manager.enabled", false);  // no passwords (key) button in the sidebar; Ctrl+Shift+L browserpass still works

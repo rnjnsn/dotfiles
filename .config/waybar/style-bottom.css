@@ -13,3 +13,17 @@ window#waybar {
     padding: 0 16px;
     color: #cdd6f4;
 }
+
+/* Line "TODO" up with the workspace number in the top bar (the workspace
+   button's text sits 4px in from the screen edge). */
+#custom-todo {
+    padding-left: 4px;
+}
+
+/* Super+b hint letters before TODO */
+#custom-hint-todo.on {
+    color: #222222;
+    background: #ffcc66;
+    padding: 0 4px;
+    margin-left: 4px;
+}

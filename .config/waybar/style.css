@@ -40,7 +40,7 @@ window#waybar {
 #custom-disk,
 #memory,
 #battery,
-#custom-pomodoro,
+#custom-timer,
 #idle_inhibitor,
 #network,
 #wireplumber,
@@ -51,17 +51,30 @@ window#waybar {
   margin-left: 40px;
 }
 
-/* Pomodoro: highlight while running */
-#custom-pomodoro.work {
+/* Timer: highlight while running */
+#custom-timer.run {
   color: #eeeeee;
   background: #005577;
   padding: 0 6px;
 }
 
-#custom-pomodoro.done {
+#custom-timer.done {
   color: #222222;
   background: #88aa66;
   padding: 0 6px;
+}
+
+/* Super+b keyboard mode: key hints shown next to the workspaces */
+#mode {
+  color: #eeeeee;
+  background: #005577;
+  padding: 0 8px;
+  margin-left: 12px;
+}
+
+/* Dropdown menus (NET menu, tray menus such as NordVPN) */
+menu menuitem {
+  padding: 4px 10px;
 }
 
 /* Keep-awake on: make it obvious so it's not left on by accident */
@@ -101,4 +114,23 @@ window#waybar {
     background: #005577;
     color: #eeeeee;
     border: 1px solid #005577;
+}
+
+/* Super+b hint letters (custom/hint-*): invisible zero-width slot normally,
+   yellow label right before its item while the mode is on. The slot carries
+   the 40px gap so the label sits tight against its item. */
+#custom-hint-timer, #custom-hint-net, #custom-hint-vol,
+#custom-hint-lang, #custom-hint-vpn {
+  margin-left: 40px;
+  padding: 0;
+}
+#custom-hint-timer.on, #custom-hint-net.on, #custom-hint-vol.on,
+#custom-hint-lang.on, #custom-hint-vpn.on {
+  color: #222222;
+  background: #ffcc66;
+  padding: 0 4px;
+  margin-right: 6px;
+}
+#custom-timer, #network, #wireplumber, #language, #tray {
+  margin-left: 0;
 }

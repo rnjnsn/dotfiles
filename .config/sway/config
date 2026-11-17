@@ -83,7 +83,7 @@ bindsym $mainMod+Shift+h resize shrink width 5 ppt
 bindsym $mainMod+Shift+l resize grow width 5 ppt
 # Swap focused window with master (Hyprland: swapwithmaster)
 bindsym $mainMod+Return exec i3a-swap
-bindsym $mainMod+t exec i3a-swap
+bindsym $mainMod+t exec ~/.config/waybar/scripts/timer.sh toggle
 # Move window to the other monitor, focus follows (Hyprland: movewindow mon:-1/+1)
 bindsym $mainMod+Control+h move container to output left, focus output left
 bindsym $mainMod+Control+l move container to output right, focus output right
@@ -160,3 +160,27 @@ for_window [app_id="firefox" title="^Picture-in-Picture$"] floating enable, stic
 
 # pavucontrol (waybar volume click): float it at a usable size instead of tiling
 for_window [app_id="^org\.pulseaudio\.pavucontrol$"] floating enable, resize set 900 600, move position center
+
+# --- Bar keyboard mode (2026-11-17) ---
+# Super+b, then one key, like Vimium hints for the bar. Yellow letters appear
+# next to each bar item while the mode is active. Esc/Return cancel.
+set $bs ~/.config/waybar/scripts
+set $barmode <span color='#ffcc66'>BAR</span> press a yellow letter · Esc cancels
+mode --pango_markup "$barmode" {
+    bindsym h exec $bs/net.sh hotspot, mode "default"
+    bindsym w exec $bs/net.sh pick, mode "default"
+    bindsym v exec sh -c 'if nordvpn status | grep -q "Status: Connected"; then nordvpn disconnect; else nordvpn connect; fi | tail -1 | xargs -0 notify-send -a NordVPN NordVPN', mode "default"
+    bindsym t exec $bs/timer.sh toggle, mode "default"
+    bindsym d exec $bs/timer.sh length, mode "default"
+    bindsym a exec ~/.local/bin/public-scripts/todo menu, mode "default"
+    bindsym o exec ~/.local/bin/public-scripts/todo plan, mode "default"
+    bindsym p exec pavucontrol, mode "default"
+    bindsym k input type:keyboard xkb_switch_layout next, mode "default"
+    bindsym Escape mode "default"
+    bindsym Return mode "default"
+    bindsym $mainMod+b mode "default"
+}
+bindsym $mainMod+b mode "$barmode"
+
+# Bar listener: new Anki/Latin word on workspace switch + Super+b hint letters
+exec ~/.config/waybar/scripts/bar-listener.sh

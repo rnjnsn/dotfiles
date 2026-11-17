@@ -3,7 +3,7 @@
   "position": "bottom",
   "height": 30,
   "modules-left": [
-    "custom/todo"
+    "custom/hint-todo", "custom/todo"
   ],
   "modules-center": [
     "custom/wotd",
@@ -14,6 +14,7 @@
     "custom/wotd-lat"
   ],
   "modules-right": [],
+  "custom/hint-todo": {"exec": "~/.config/waybar/scripts/hint.sh 'a o'", "interval": "once", "signal": 12, "return-type": "json", "tooltip": false},
   "custom/todo": {
     "exec": "/home/rene/.local/bin/public-scripts/todo status",
     "interval": 10,
@@ -26,54 +27,54 @@
   },
   "custom/wotd": {
     "exec": "/usr/bin/python3 /home/rene/.config/waybar/scripts/wotd.py",
-    "interval": 15,
+    "interval": "once",
     "format": "{}",
     "tooltip": true,
     "return-type": "json",
-    "signal": 8
+    "signal": 11
   },
   "custom/wotd-en": {
     "exec": "/usr/bin/python3 /home/rene/.config/waybar/scripts/wotd_lang.py en",
-    "interval": 86400,
+    "interval": 3600,
     "format": "  EN: {}",
     "tooltip": true,
     "return-type": "json",
-    "on-right-click": "bash -c '/usr/bin/python3 /home/rene/.config/waybar/scripts/save_word.py en'",
+    "on-click-right": "/usr/bin/python3 /home/rene/.config/waybar/scripts/save_word.py en",
     "signal": 8
   },
   "custom/wotd-de": {
     "exec": "/usr/bin/python3 /home/rene/.config/waybar/scripts/wotd_lang.py de",
-    "interval": 86400,
+    "interval": 3600,
     "format": " · DE: {}",
     "tooltip": true,
     "return-type": "json",
-    "on-right-click": "bash -c '/usr/bin/python3 /home/rene/.config/waybar/scripts/save_word.py de'",
+    "on-click-right": "/usr/bin/python3 /home/rene/.config/waybar/scripts/save_word.py de",
     "signal": 8
   },
   "custom/wotd-fr": {
     "exec": "/usr/bin/python3 /home/rene/.config/waybar/scripts/wotd_lang.py fr",
-    "interval": 86400,
+    "interval": 3600,
     "format": " · FR: {}",
     "tooltip": true,
     "return-type": "json",
-    "on-right-click": "bash -c '/usr/bin/python3 /home/rene/.config/waybar/scripts/save_word.py fr'",
+    "on-click-right": "/usr/bin/python3 /home/rene/.config/waybar/scripts/save_word.py fr",
     "signal": 8
   },
   "custom/wotd-it": {
     "exec": "/usr/bin/python3 /home/rene/.config/waybar/scripts/wotd_lang.py it",
-    "interval": 86400,
+    "interval": 3600,
     "format": " · IT: {}",
     "tooltip": true,
     "return-type": "json",
-    "on-right-click": "bash -c '/usr/bin/python3 /home/rene/.config/waybar/scripts/save_word.py it'",
+    "on-click-right": "/usr/bin/python3 /home/rene/.config/waybar/scripts/save_word.py it",
     "signal": 8
   },
   "custom/wotd-lat": {
     "exec": "/usr/bin/python3 /home/rene/.config/waybar/scripts/wotd_lat.py",
-    "interval": 15,
+    "interval": "once",
     "format": " · LAT: {}",
     "return-type": "json",
     "tooltip": true,
-    "signal": 8
+    "signal": 11
   }
 }
