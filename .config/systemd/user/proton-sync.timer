@@ -1,9 +1,10 @@
 [Unit]
-Description=Run Proton Drive sync every 1h
+Description=Daily Proton Drive backup of docs/lit (selection)
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=1h
+OnBootSec=10min
+OnCalendar=daily
+RandomizedDelaySec=30min
 Persistent=true
 
 [Install]

@@ -1,5 +1,5 @@
 [Unit]
-Description=Proton Drive Sync (docs/lit and docs/audiobooks)
+Description=Proton Drive backup of docs/lit (files < 10 MB + own files)
 After=network-online.target
 
 [Service]
