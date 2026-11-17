@@ -479,12 +479,12 @@ map gl cd ~/docs/lit
 map gn cd ~/notes
 
 # Shell aliases in lf: ' + alias name + Enter, e.g. 'dl ⏎ or 'cv ⏎.
-# Reads ~/.aliases.bash, so the names are always the same as in the shell.
+# Reads ~/.config/shell/aliases.sh, so the names are always the same as in the shell.
 # "cd" aliases go to the folder (or select the file), editor aliases open the file.
 cmd goto ${{
-    def=$(bash -c 'shopt -s expand_aliases; source ~/.aliases.bash >/dev/null 2>&1; alias -- "$1"' _ "$1" 2>/dev/null) || true
+    def=$(bash -c 'shopt -s expand_aliases; source ~/.config/shell/aliases.sh >/dev/null 2>&1; alias -- "$1"' _ "$1" 2>/dev/null) || true
     if [ -z "$def" ]; then
-        lf -remote "send $id echoerr No alias named '$1' in ~/.aliases.bash"
+        lf -remote "send $id echoerr No alias named '$1' in ~/.config/shell/aliases.sh"
         exit 0
     fi
     eval "set -- ${def#*=}"   # alias prints name='value'; unquote the value
@@ -521,9 +521,6 @@ map J jumps
 # ========================================
 
 map V push $"$EDITOR"<space>
-
-# Hyprland
-map eh $"$EDITOR" ~/.config/hypr/hyprland.conf
 
 # Website CSS files
 map ewba $"$EDITOR" ~/projects/rnjnsn-website/static/base.css

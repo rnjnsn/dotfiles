@@ -1,5 +1,5 @@
 # ~/.zshrc — interactive zsh. Environment and PATH live in ~/.zshenv.
-# Ported from ~/.bashrc; aliases stay shared in ~/.aliases.bash (lf reads it too).
+# Aliases live in ~/.config/shell/aliases.sh (shared with lf).
 
 # =============================================================================
 # OPTIONS
@@ -162,18 +162,27 @@ _clear_stale_display_vars() {
   fi
 }
 sway()     { _clear_stale_display_vars; command sway "$@"; }
-Hyprland() { _clear_stale_display_vars; command Hyprland "$@"; }
 
 # =============================================================================
 # INTEGRATIONS
 # =============================================================================
 
-[[ -f ~/.fzf.bash ]] && source ~/.fzf.bash   # only exports FZF_* variables
+# fzf defaults (was ~/.fzf.bash)
+export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
+export FZF_DEFAULT_OPTS='
+--height=100%
+--layout=reverse
+--border
+--preview="bat --color=always {} || cat {}"
+--header="Press Ctrl+L to open file, Ctrl+R to open directory"
+--bind="ctrl-l:execute(bash -c \"~/.local/bin/public-scripts/fzopen \\\"{}\\\"\")+abort"
+--bind="ctrl-r:execute(bash -c \"cd \\\"$(dirname {})\\\" && lf\")"
+'
 # fzf keys: Ctrl+T insert file path, Alt+C cd into dir (Ctrl+R is taken over by atuin below)
 (( $+commands[fzf] )) && source <(command fzf --zsh)
 
 # zoxide: `j foo` jumps to the most-used dir matching "foo", `ji` picks interactively
-# (bound to j, not z, because z() already opens zathura in ~/.aliases.bash)
+# (bound to j, not z, because z() already opens zathura in ~/.config/shell/aliases.sh)
 (( $+commands[zoxide] )) && eval "$(zoxide init zsh --cmd j)"
 
 # atuin: searchable shell history on Ctrl+R (Up arrow keeps normal behaviour)
@@ -182,12 +191,12 @@ Hyprland() { _clear_stale_display_vars; command Hyprland "$@"; }
 (( $+commands[pyenv] )) && eval "$(pyenv init - zsh)"
 
 # =============================================================================
-# ALIASES (shared with bash and lf)
+# ALIASES (shared with lf)
 # =============================================================================
 
 alias tree='tree -a'
 alias df='df -h'
-[[ -f ~/.aliases.bash ]] && source ~/.aliases.bash
+[[ -f ~/.config/shell/aliases.sh ]] && source ~/.config/shell/aliases.sh
 
 # =============================================================================
 # PLUGINS (pacman: zsh-autosuggestions zsh-syntax-highlighting) — keep last

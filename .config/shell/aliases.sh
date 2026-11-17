@@ -1,4 +1,4 @@
-# Aliases and functions for shell convenience (sourced by ~/.bashrc)
+# Aliases and functions, sourced by ~/.zshrc and read by lf (the goto command in lfrc).
 
 # Use neovim for vim if present
 command -v nvim >/dev/null && alias vim="nvim" vimdiff="nvim -d"
@@ -63,7 +63,6 @@ alias \
   l="cd ~/docs/lit" \
   p="cd ~/projects" \
   g="git" \
-  h="nvim ~/.config/hypr/hyprland.conf" \
   n="cd ~/notes" \
   r="cd ~/docs/career/resumebuilder" \
   s="cd ~/.local/bin/public-scripts"

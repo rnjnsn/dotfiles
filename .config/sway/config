@@ -5,7 +5,7 @@ exec systemctl --user import-environment WAYLAND_DISPLAY DISPLAY
 gaps inner 5
 gaps outer 10
 default_border pixel 3
-# Red borders like Hyprland (active CF3838, inactive C77777)
+# Red borders (active CF3838, inactive C77777)
 #                       border   bg       text     indicator child_border
 client.focused          #CF3838  #CF3838  #ffffff  #CF3838   #CF3838
 client.focused_inactive #C77777  #C77777  #ffffff  #C77777   #C77777
@@ -69,22 +69,23 @@ bindsym $mainMod+Shift+n exec $notes_app
 bindsym $mainMod+Shift+m exec sh -c 'swaymsg "workspace number 5" && sleep 0.3 && $mail'
 bindsym $mainMod+Shift+c exec sh -c 'swaymsg "workspace number 6" && sleep 0.3 && $calendar'
 bindsym $mainMod+p exec $menu
-bindsym Mod4+Shift+P exec hyprpicker -a
+# Super+Shift+P: pick a colour on screen, hex goes to the clipboard
+bindsym Mod4+Shift+P exec ~/.local/bin/public-scripts/colorpick
 bindsym $mainMod+Shift+q kill
 bindsym $mainMod+j focus down
 bindsym $mainMod+k focus up
 bindsym $mainMod+h focus left
 bindsym $mainMod+l focus right
-# DWM-like window movement (Hyprland: swapnext / swapprev)
+# DWM-like window movement
 bindsym $mainMod+Shift+j move down
 bindsym $mainMod+Shift+k move up
-# DWM-like resizing (Hyprland: splitratio -/+ 0.05)
+# DWM-like resizing
 bindsym $mainMod+Shift+h resize shrink width 5 ppt
 bindsym $mainMod+Shift+l resize grow width 5 ppt
-# Swap focused window with master (Hyprland: swapwithmaster)
+# Swap focused window with master
 bindsym $mainMod+Return exec i3a-swap
 bindsym $mainMod+t exec ~/.config/waybar/scripts/timer.sh toggle
-# Move window to the other monitor, focus follows (Hyprland: movewindow mon:-1/+1)
+# Move window to the other monitor, focus follows
 bindsym $mainMod+Control+h move container to output left, focus output left
 bindsym $mainMod+Control+l move container to output right, focus output right
 bindsym $mainMod+space floating toggle

@@ -20,7 +20,6 @@ all_options="$programs"$'\n'"$bookmarks"$'\n'"$notes"$'\n'"$docs"
 # Show fuzzel menu and get selection
 # Full-width strip: width (in characters) depends on the focused screen
 output=$(swaymsg -t get_outputs 2>/dev/null | jq -r '.[] | select(.focused) | .name')
-[ -z "$output" ] && output=$(hyprctl -j monitors 2>/dev/null | jq -r '.[] | select(.focused) | .name')
 case "$output" in
     eDP-1) width=238 ;;  # laptop, 1920px @ 1.0
     *)     width=294 ;;  # DP-1, 2560px logical @ 1.5

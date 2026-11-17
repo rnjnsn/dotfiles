@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Click a pixel on screen; its colour (#rrggbb) goes to the clipboard.
+# Sway: Super+Shift+P. Needs slurp, grim, imagemagick, wl-copy.
+pos=$(slurp -p) || exit 0
+hex=$(grim -g "$pos" -t ppm - | magick - -format '#%[hex:p{0,0}]' info:) || exit 1
+hex=${hex:0:7}
+printf '%s' "$hex" | wl-copy
+notify-send -a colorpick "Colour copied" "$hex"
