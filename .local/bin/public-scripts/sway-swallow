@@ -1,0 +1,234 @@
+#!/home/rene/.pyenv/versions/3.11.9/bin/python3.11
+"""sway-swallow: window swallowing that keeps the i3a-master-stack layout.
+
+A viewer (zathura, mpv) started from a foot terminal takes over the
+terminal's exact tile; the terminal goes to the scratchpad. When the last
+viewer of that terminal closes, the terminal returns to the same workspace
+and the same position in the master/stack order.
+
+Built on the helpers of i3a-swallow (pip package i3a), which alone puts the
+viewer at the end of the stack and the terminal back at the bottom.
+
+Run from the sway config:  exec ~/.local/bin/public-scripts/sway-swallow
+Debug:                     sway-swallow --debug
+"""
+import argparse
+import asyncio
+import logging as log
+import re
+import sys
+
+from i3ipc import Event
+from i3ipc.aio import Connection
+from i3a.swallow import ps_ppids, find_by_pid, class_or_app_id
+
+CHILDREN = [r'^org\.pwmt\.zathura$', r'^mpv$']
+PARENTS = [r'^foot$']
+FLOATING = ('auto_on', 'user_on')
+
+
+def tiled(ws):
+    return [c for c in ws.leaves() if c.floating not in FLOATING]
+
+
+def matches(cont, pats):
+    name = class_or_app_id(cont) or ''
+    return any(p.search(name) for p in pats)
+
+
+class Swallower:
+    def __init__(self, children, parents):
+        self.children_re = children
+        self.parents_re = parents
+        self.child_parent = {}   # child con id -> parent con id
+        self.parent_children = {}  # parent con id -> [child con ids]
+        self.slot = {}           # child con id -> (workspace name, tiled index)
+
+    async def cmd(self, c):
+        log.debug(c)
+        for r in await self.i3.command(c):
+            if not r.success:
+                log.debug('  failed: %s', r.error)
+
+    async def settled(self, con_id):
+        """Wait until i3a-master-stack has placed the new window (it reacts
+        to the same window::new event): the window is the last tiled one on
+        its workspace and nothing changed for one poll."""
+        last = None
+        for _ in range(20):
+            tree = await self.i3.get_tree()
+            c = tree.find_by_id(con_id)
+            if c is None:
+                return None
+            ws = c.workspace()
+            order = [n.id for n in tiled(ws)] if ws else []
+            if order == last:
+                return tree
+            last = order
+            await asyncio.sleep(0.05)
+        return tree
+
+    async def remember(self):
+        if not self.child_parent:
+            return
+        tree = await self.i3.get_tree()
+        for cid in self.child_parent:
+            c = tree.find_by_id(cid)
+            if c is None or c.floating in FLOATING or c.workspace() is None:
+                continue
+            ws = c.workspace()
+            self.slot[cid] = (ws.name, [n.id for n in tiled(ws)].index(cid))
+
+    async def on_window(self, i3, e):
+        if e.change == 'new':
+            await self.win_new(e)
+        elif e.change == 'close':
+            await self.win_close(e)
+        else:  # move, focus, floating, ...: keep child positions current
+            await self.remember()
+
+    async def win_new(self, e):
+        child = e.container
+        if not matches(child, self.children_re) or not child.pid:
+            return
+        tree = await self.i3.get_tree()
+        for ppid in ps_ppids(child.pid):
+            parent = find_by_pid(tree, ppid)
+            if parent is None:
+                continue
+            if parent.id in self.parent_children:
+                # parent already swallowed by an earlier viewer
+                self._manage(child.id, parent.id)
+                log.debug('extra child %s of %s', child.id, parent.id)
+                await self.remember()
+                return
+            if not matches(parent, self.parents_re) or parent.scratchpad() == parent.workspace():
+                return
+            break
+        else:
+            return
+
+        tree = await self.settled(child.id)
+        if tree is None:
+            return
+        c, p = tree.find_by_id(child.id), tree.find_by_id(parent.id)
+        if c is None or p is None or c.floating in FLOATING or p.floating in FLOATING:
+            return  # floating viewer or terminal: leave both alone
+        if c.workspace() is None or p.workspace() is None or c.workspace().id != p.workspace().id:
+            return
+
+        self._manage(child.id, parent.id)
+        # child into the terminal's tile, terminal to the child's (last) tile,
+        # then the terminal leaves: removing the last stack window does not
+        # reshuffle the layout
+        await self.cmd('[con_id={}] swap container with con_id {}'.format(child.id, parent.id))
+        await self.cmd('[con_id={}] move scratchpad'.format(parent.id))
+        await self.cmd('[con_id={}] focus'.format(child.id))
+        log.info('swallowed %s for %s', parent.id, child.id)
+        await asyncio.sleep(0.1)
+        await self.remember()
+
+    async def win_close(self, e):
+        cid = e.container.id
+        if cid in self.parent_children:  # a swallowed terminal was killed
+            for ch in self.parent_children.pop(cid):
+                self.child_parent.pop(ch, None)
+                self.slot.pop(ch, None)
+            return
+        pid = self.child_parent.pop(cid, None)
+        if pid is None:
+            return
+        slot = self.slot.pop(cid, None)
+        rest = self.parent_children[pid]
+        rest.remove(cid)
+        if rest:
+            return
+        del self.parent_children[pid]
+
+        tree = await self.i3.get_tree()
+        p = tree.find_by_id(pid)
+        if p is None or p.scratchpad() != p.workspace():
+            return  # terminal gone or taken out of the scratchpad by hand
+
+        focused = tree.find_focused()
+        here = focused.workspace().name if focused and focused.workspace() else None
+        ws_name, index = slot if slot else (here, None)
+
+        await asyncio.sleep(0.15)  # let i3a-master-stack rebuild after the close
+        if ws_name == here:
+            await self.cmd('[con_id={}] scratchpad show, floating disable, focus'.format(pid))
+        else:
+            # viewer closed on a workspace you are not looking at: put the
+            # terminal back there without switching workspaces
+            await self.cmd('[con_id={}] move to workspace "{}", floating disable'.format(
+                pid, ws_name.replace('"', '\\"')))
+        log.info('restored %s', pid)
+        if index is None:
+            return
+
+        # master-stack appended the terminal at the end of the stack; walk it
+        # back to the viewer's old position, one swap at a time
+        await asyncio.sleep(0.15)
+        tree = await self.i3.get_tree()
+        p = tree.find_by_id(pid)
+        if p is None or p.workspace() is None:
+            return
+        order = [n.id for n in tiled(p.workspace())]
+        if pid not in order:
+            return
+        at = order.index(pid)
+        while at > index:
+            await self.cmd('[con_id={}] swap container with con_id {}'.format(pid, order[at - 1]))
+            order[at - 1], order[at] = order[at], order[at - 1]
+            at -= 1
+
+    async def on_binding(self, i3, e):
+        # bindings like Super+Return exec i3a-swap, which runs after this
+        # event and sends no window event of its own
+        await asyncio.sleep(0.4)
+        await self.remember()
+
+    async def poll(self):
+        while True:
+            await asyncio.sleep(2)
+            try:
+                await self.remember()
+            except Exception as ex:  # never let the poller die
+                log.debug('poll: %s', ex)
+
+    def _manage(self, cid, pid):
+        self.child_parent[cid] = pid
+        self.parent_children.setdefault(pid, []).append(cid)
+
+    async def run(self):
+        self.i3 = await Connection(auto_reconnect=True).connect()
+        self.i3.on(Event.WINDOW, self.on_window)
+        self.i3.on(Event.BINDING, self.on_binding)
+        log.debug('sway-swallow ready')
+        poller = asyncio.ensure_future(self.poll())
+        try:
+            await self.i3.main()
+        finally:
+            poller.cancel()
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument('-c', '--child', action='append',
+                    help='app_id regex of windows that swallow (default: zathura, mpv)')
+    ap.add_argument('-p', '--parent', action='append',
+                    help='app_id regex of terminals that get swallowed (default: ^foot$)')
+    ap.add_argument('--debug', action='store_true')
+    a = ap.parse_args()
+    log.basicConfig(format='%(message)s', level=log.DEBUG if a.debug else log.INFO)
+    sw = Swallower([re.compile(x) for x in (a.child or CHILDREN)],
+                   [re.compile(x) for x in (a.parent or PARENTS)])
+    try:
+        asyncio.run(sw.run())
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

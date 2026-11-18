@@ -134,6 +134,9 @@ for_window [app_id="^dwds$"] floating enable, resize set 900 750, move position 
 exec ~/.config/swaybg/launch.sh
 bindsym $mainMod+Shift+f exec $anki
 exec /home/rene/.local/bin/i3a-master-stack --stack=dwm --stack-size=35
+# Swallowing: zathura/mpv started from a foot terminal take over its tile; the
+# terminal returns to the same spot when they close (log: sway-swallow --debug)
+exec ~/.local/bin/public-scripts/sway-swallow
 bindsym $mainMod+Shift+z exec swaylock
 bindsym Mod4+Shift+t exec ~/.local/bin/private-scripts/claude-translate
 
