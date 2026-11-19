@@ -15,15 +15,21 @@ p { margin: 2pt 0; }
 table { width: 100%; border-collapse: collapse; margin-bottom: 4pt; }
 tr { break-inside: avoid; }
 th, td { text-align: left; vertical-align: top; padding: 1pt 3pt; border-bottom: 0.5pt solid #ddd; }
-td:last-child { white-space: nowrap; font-family: monospace; font-weight: bold; }
+table { table-layout: fixed; }
+th:first-child { width: 55%; }
+td { overflow-wrap: anywhere; }
+td:nth-child(2) { font-family: monospace; font-weight: bold; }
 th { background: #eee; }
 code { font-size: 8.5pt; }
 CSS
 if [[ ! -f "$pdf" || "$note" -nt "$pdf" ]]; then
-  # body only: drop frontmatter and everything from "## Connections" on; unwrap [[links]];
+  # body only: drop frontmatter, the Category column, and everything from "## Connections" on; unwrap [[links]];
   # promote headings one level (## -> #)
   awk 'NR==1 && /^---$/ {fm=1; next} fm && /^---$/ {fm=0; next} fm {next}
-       /^## Connections/ {exit} {print}' "$note" \
+       /^## Connections/ {exit}
+       /^\| Does \| Key \| Category \|$/ {cat=1; print "| Does | Key |"; next}
+       cat && /^\|/ {if ($0 ~ /^\|---\|---\|---\|$/) print "|---|---|"; else {sub(/ [^|]*\|$/, ""); print}; next}
+       {cat=0; print}' "$note" \
     | sed -E 's/\[\[([^]|]+)(\|[^]]+)?\]\]/\1/g; s/^#(#+ )/\1/' \
     | pandoc -f markdown -t html5 --standalone --metadata title=" " \
         --css "$css" --pdf-engine=weasyprint -o "$pdf" 2>"$dir/build.log" \

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fuzzy search over every '| Does | Key |' table in the keybindings note.
 
-Rows show as  App › group  │  does  │  key  in fuzzel. Enter copies the key
+Rows show as  Kind: App › Area │ Category │ Does │ Key  in fuzzel. Enter copies the key
 to the clipboard and shows the whole row as a notification.
 """
 import os, re, subprocess, sys
@@ -30,20 +30,21 @@ for line in open(NOTE, encoding="utf-8"):
         if c[:2] == ["Does", "Key"]:
             in_table = True
         elif in_table and not set(c[0]) <= set("-: "):
-            rows.append((app + (f" › {group}" if group else ""), plain(c[0]), plain(c[1])))
+            rows.append((app + (f" › {group}" if group else ""),
+                         c[2] if len(c) > 2 else "", plain(c[0]), plain(c[1])))
     else:
         in_table = False
 
 def cut(s, n):
     return s if len(s) <= n else s[: n - 1] + "…"
 
-lines = [f"{cut(a, 36):<36} │ {cut(d, 66):<66} │ {k}" for a, d, k in rows]
+lines = [f"{cut(a, 40):<40} │ {g:<8} │ {cut(d, 60):<60} │ {k}" for a, g, d, k in rows]
 res = subprocess.run(
-    ["fuzzel", "--dmenu", "--index", "--anchor=center", "--lines=25", "--width=150",
+    ["fuzzel", "--dmenu", "--index", "--anchor=center", "--lines=25", "--width=160",
      "--prompt=keys › "],
     input="\n".join(lines), text=True, capture_output=True)
 if res.returncode != 0 or not res.stdout.strip().isdigit():
     sys.exit(0)
-a, d, k = rows[int(res.stdout.strip())]
+a, g, d, k = rows[int(res.stdout.strip())]
 subprocess.run(["wl-copy", "--", k])
-subprocess.run(["notify-send", "-a", "keybindings", f"{k}", f"{a}: {d}"])
+subprocess.run(["notify-send", "-a", "keybindings", f"{k}", f"{a} · {g}\n{d}"])
