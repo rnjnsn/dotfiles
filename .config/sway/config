@@ -159,6 +159,10 @@ exec udiskie --automount --notify
 bindsym $mainMod+y exec ~/.local/bin/public-scripts/mpv-url
 # Super+o: fuzzel over Firefox bookmarks + history; free text = DuckDuckGo search
 bindsym $mainMod+o exec ~/.local/bin/public-scripts/ffpick
+# Super+F1: fuzzy search over all keybindings (~/notes/00_inbox/keybindings.md)
+bindsym $mainMod+F1 exec ~/.local/bin/public-scripts/kb-search
+# Super+Shift+F1: the same note as a PDF in zathura (rebuilt when the note changes)
+bindsym $mainMod+Shift+F1 exec ~/.local/bin/public-scripts/kb-pdf
 # Picture-in-Picture: small, floating, sticky, bottom-right
 for_window [app_id="firefox" title="^Picture-in-Picture$"] floating enable, sticky enable, resize set 640 360, move position 100 ppt 100 ppt, move left 660 px, move up 380 px
 
@@ -188,3 +192,7 @@ bindsym $mainMod+b mode "$barmode"
 
 # Bar listener: new Anki/Latin word on workspace switch + Super+b hint letters
 exec ~/.config/waybar/scripts/bar-listener.sh
+
+# ncmpcpp: floating, centered, big enough (ncmpcpp freezes below ~6 rows)
+bindsym $mainMod+m exec $terminal --app-id=ncmpcpp ncmpcpp
+for_window [app_id="^ncmpcpp$"] floating enable, resize set 1100 700, move position center
