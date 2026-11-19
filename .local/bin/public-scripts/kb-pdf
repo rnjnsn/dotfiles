@@ -23,11 +23,11 @@ th { background: #eee; }
 code { font-size: 8.5pt; }
 CSS
 if [[ ! -f "$pdf" || "$note" -nt "$pdf" ]]; then
-  # body only: drop frontmatter, the Category column, and everything from "## Connections" on; unwrap [[links]];
+  # body only: drop frontmatter, the Action column, and everything from "## Connections" on; unwrap [[links]];
   # promote headings one level (## -> #)
   awk 'NR==1 && /^---$/ {fm=1; next} fm && /^---$/ {fm=0; next} fm {next}
        /^## Connections/ {exit}
-       /^\| Does \| Key \| Category \|$/ {cat=1; print "| Does | Key |"; next}
+       /^\| Does \| Key \| Action \|$/ {cat=1; print "| Does | Key |"; next}
        cat && /^\|/ {if ($0 ~ /^\|---\|---\|---\|$/) print "|---|---|"; else {sub(/ [^|]*\|$/, ""); print}; next}
        {cat=0; print}' "$note" \
     | sed -E 's/\[\[([^]|]+)(\|[^]]+)?\]\]/\1/g; s/^#(#+ )/\1/' \

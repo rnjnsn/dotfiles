@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fuzzy search over every '| Does | Key |' table in the keybindings note.
 
-Rows show as  Kind: App › Area │ Category │ Does │ Key  in fuzzel. Enter copies the key
+Rows show as  Kind: App › Area │ Action │ Does │ Key  in fuzzel. Enter copies the key
 to the clipboard and shows the whole row as a notification.
 """
 import os, re, subprocess, sys
