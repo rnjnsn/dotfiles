@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# tm: jump to a tmux session, or start one in a directory zoxide knows.
+#
+#   tm          fzf list: open sessions first (● = shown in a terminal), then zoxide dirs
+#   tm <query>  same list, pre-filtered
+#
+# Enter: switch to the session (a dir becomes a session named after its folder,
+#        created if needed). Ctrl-x: kill the highlighted session.
+# Inside tmux it switches the current terminal; outside it attaches.
+# Bound to prefix f in ~/.tmux.conf (opens in a popup).
+
+list() {
+	tmux list-sessions -F '#{session_last_attached} #{?session_attached,●,○} #S  #{session_windows}w  #{pane_current_command}' 2>/dev/null |
+		sort -rn | cut -d' ' -f2- |
+		while read -r mark name rest; do printf 's\t%s\t%s %s  %s\n' "$name" "$mark" "$name" "$rest"; done
+	zoxide query -l 2>/dev/null | while read -r dir; do
+		printf 'd\t%s\t  %s\n' "$dir" "${dir/#$HOME/\~}"
+	done
+}
+
+[[ $1 == --list ]] && { list; exit; }
+
+pick=$(list | command fzf --delimiter='\t' --with-nth=3 --nth=1.. \
+	--query="$*" --no-sort --reverse --prompt='tm> ' \
+	--header='enter: go   ctrl-x: kill session' \
+	--bind="ctrl-x:execute-silent([[ {1} == s ]] && tmux kill-session -t ={2})+reload($0 --list)") || exit 0
+
+kind=$(cut -f1 <<<"$pick")
+target=$(cut -f2 <<<"$pick")
+
+if [[ $kind == d ]]; then
+	name=$(basename "$target")
+	[[ $target == "$HOME" ]] && name=home
+	name=${name//[.:]/_} # tmux does not allow . or : in session names
+	tmux has-session -t "=$name" 2>/dev/null || tmux new-session -d -s "$name" -c "$target"
+	target=$name
+fi
+
+if [[ -n $TMUX ]]; then
+	tmux switch-client -t "=$target"
+else
+	tmux attach-session -t "=$target"
+fi
