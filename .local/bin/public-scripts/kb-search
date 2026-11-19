@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Fuzzy search over every '| Does | Key |' table in the keybindings note.
+
+Rows show as  App › group  │  does  │  key  in fuzzel. Enter copies the key
+to the clipboard and shows the whole row as a notification.
+"""
+import os, re, subprocess, sys
+
+NOTE = os.path.expanduser(os.environ.get("KB_NOTE", "~/notes/00_inbox/keybindings.md"))
+
+def cells(line):
+    parts = re.split(r"(?<!\\)\|", line.strip().strip("|"))
+    return [p.strip().replace("\\|", "|").replace("\\\\", "\\") for p in parts]
+
+def plain(s):
+    s = re.sub(r"\[\[([^\]|]+)(\|[^\]]+)?\]\]", r"\1", s)
+    return s.replace("**", "").replace("`", "").replace("*", "")
+
+rows, app, group, in_table = [], "", "", False
+for line in open(NOTE, encoding="utf-8"):
+    if line.startswith("#### "):
+        app, group = line[5:].strip(), ""
+        app = re.sub(r"\s*\(.*\)$", "", app)          # "tmux (prefix Ctrl-a)" -> "tmux"
+    elif re.match(r"^\*\*[^*]+\*\*", line) and not line.startswith("|"):
+        group = re.match(r"^\*\*([^*]+)\*\*", line).group(1).rstrip(":")
+    elif line.startswith("|"):
+        c = cells(line)
+        if c[:2] == ["Does", "Key"]:
+            in_table = True
+        elif in_table and not set(c[0]) <= set("-: "):
+            rows.append((app + (f" › {group}" if group else ""), plain(c[0]), plain(c[1])))
+    else:
+        in_table = False
+
+def cut(s, n):
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+lines = [f"{cut(a, 22):<22} │ {cut(d, 70):<70} │ {k}" for a, d, k in rows]
+res = subprocess.run(
+    ["fuzzel", "--dmenu", "--index", "--anchor=center", "--lines=25", "--width=140",
+     "--prompt=keys › "],
+    input="\n".join(lines), text=True, capture_output=True)
+if res.returncode != 0 or not res.stdout.strip().isdigit():
+    sys.exit(0)
+a, d, k = rows[int(res.stdout.strip())]
+subprocess.run(["wl-copy", "--", k])
+subprocess.run(["notify-send", "-a", "keybindings", f"{k}", f"{a}: {d}"])
